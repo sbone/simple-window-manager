@@ -1,4 +1,4 @@
-.PHONY: build run release test check-accessibility
+.PHONY: build run release test check-accessibility smoke-test
 
 build:
 	bash scripts/build-app.sh
@@ -11,6 +11,9 @@ release:
 
 test:
 	swift test
+
+smoke-test:
+	bash scripts/smoke-test.sh
 
 check-accessibility:
 	@mkdir -p .build

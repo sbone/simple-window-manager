@@ -7,6 +7,7 @@ let package = Package(
     products: [.executable(name: "OptimalLayout", targets: ["OptimalLayout"])],
     targets: [
         .executableTarget(name: "OptimalLayout"),
+        .executableTarget(name: "OLSmokeTest", path: "SmokeTests"),
         .testTarget(name: "OptimalLayoutTests", dependencies: ["OptimalLayout"])
     ]
 )

@@ -18,7 +18,7 @@ if [ -z "$signing_identity" ]; then
     exit 1
 fi
 
-swift build "${build_args[@]}"
+swift build --product OptimalLayout "${build_args[@]}"
 bin_dir=$(swift build "${build_args[@]}" --show-bin-path)
 app="Optimal Layout.app"
 mkdir -p "$app/Contents/MacOS"

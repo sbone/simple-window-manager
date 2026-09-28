@@ -178,30 +178,59 @@ five exclusive shortcuts while the signed app was running. Carbon returned
 `eventHotKeyExistsErr` (`-9878`) for each, and the production registration code
 reported the correct combination. The probe sent no keystrokes or window
 commands. The signed universal build passed verification and retained
-Accessibility access. GUI warning presentation still needs an integration test.
+Accessibility access. The GUI harness below now also checks warning presentation.
 
-### Next automation layer
+### GUI smoke test
 
-Geometry tests cannot prove that another app accepts a window resize or that
-macOS delivers a shortcut. An opt-in GUI integration harness is the next step;
-it is not implemented yet. It should create its own resizable test window,
-focus it, send each shortcut (and activate each menu item through Accessibility),
-then poll the actual window frame with a deadline and a small point tolerance.
-It should close its own window when finished. Restart OL to establish known
-cycle state before each complete run.
+```sh
+make smoke-test
+```
 
-| Behavior | Programmatic check still needed |
-| --- | --- |
-| Shortcuts and menu actions | Drive the running app and compare actual window frames with expected placements. |
-| Switch Display | Use connected displays, check transfer in both directions and wraparound; skip explicitly if only one display is connected. |
-| Shortcut conflicts | Reserve a shortcut before launching OL and check the actual menu warning; injected registration-failure tests already pass. |
-| Accessibility failures | Exercise real denied/rejected operations and check the menu feedback; injected failure tests already pass. |
-| Launch at login | After implementation, verify registration state and separately verify launch in a fresh login session. |
+This opt-in test requires a logged-in macOS desktop, Swift 6.2+, and the stable
+signing configuration above. It builds the main app and a separate signed helper
+at `.build/OL Smoke Test.app`. On first run, grant **OL Smoke Test** Accessibility
+access in System Settings, then rerun the command. OL also needs its existing
+grant. Missing permission reports `BLOCKED` and a nonzero command exit; the test
+does not grant permissions automatically.
 
-The GUI harness will need a logged-in macOS desktop and Accessibility permission
-for both OL and the helper. Permission grants remain a user action. Synthetic
-display rectangles cover geometry today; they do not replace a real multi-display
-integration run.
+The helper creates its own disposable window and temporarily takes focus.
+**Leave the keyboard and mouse idle while it runs.** Click **Stop Test** or close
+the test window to cancel. The helper checks focus before sending shortcuts or
+selecting menu commands. Existing user document windows are not test fixtures.
+
+The run covers:
+
+- Full, centered, left/right, and clockwise quadrant placements through both
+  real keyboard events and Accessibility-driven menu clicks, including wraparound.
+- A non-resizable window: no partial movement, the `OL!` indicator, the failure
+  menu entry, dialog text/dismissal, retry staying at the first half, and warning clearance.
+- A deliberately reserved ⌘⌥2 shortcut: the conflict indicator and exact dialog
+  text, other shortcuts still working, the corresponding menu action still working,
+  warnings surviving successful commands, and a clean restart after releasing the shortcut.
+- With multiple connected displays, next-display movement through shortcuts and
+  menu actions with wraparound, preserving size and relative position. A one-display
+  setup prints an explicit `SKIP` for this portion.
+
+Expected rectangles are calculated from the product specification independently
+of production geometry. The helper observes its real `NSWindow.frame`, allows
+2 points of rounding tolerance, and requires three matching samples. It polls
+conditions with four-second deadlines instead of assuming success after a fixed
+delay. Cross-process Accessibility work runs off the main actor so the helper
+can continue serving OL's window queries and writes.
+
+Results are saved to `.build/smoke-test.log`; failures include expected/actual
+frames or an explanation plus a bounded Accessibility snapshot of OL. Helper
+stderr goes to `.build/smoke-test-stderr.log`. The command returns nonzero for
+failure, cancellation, or missing permission. It releases the helper's temporary
+shortcut, closes its windows, and restarts one normal OL instance after the run.
+A lock prevents overlapping runs; after a force-kill, remove a stale
+`.build/smoke-test.lock` directory only after confirming no helper is running.
+
+**Verified on 2026-09-28:** 27 GUI checks passed on the M4 Air; multi-display
+placement was explicitly skipped because macOS exposed one display. The helper's
+first run also correctly reported missing permission and restored OL. These
+checks cover the controlled AppKit test window, not every application's sizing
+constraints or every display arrangement.
 
 ## Manual smoke test
 
@@ -214,12 +243,11 @@ integration run.
 5. Quit from the menu and confirm the process exits.
 
 On 2026-09-28, the user confirmed successful VS Code window adjustment on the
-M4 MacBook Air. Cycle calculations now have automated coverage; complete
-shortcut delivery and the remaining GUI smoke tests above have not yet been confirmed.
+M4 MacBook Air. Cycle calculations now have automated coverage; shortcut and menu delivery plus warning presentation now pass the automated GUI
+harness. Physical multi-display behavior and other applications' edge cases remain.
 
-Window behavior is still a prototype: physical multi-display behavior, failure
-feedback, shortcut conflicts, and non-resizable/full-screen windows need GUI
-validation. The app checks API results but does not yet read the resulting frame
+Window behavior is still a prototype: physical multi-display behavior and
+third-party/full-screen window constraints still need validation. The app checks API results but does not yet read the resulting frame
 back: an app can report success while constraining the requested size. Preferences
 and launch at login are not implemented yet.
 
