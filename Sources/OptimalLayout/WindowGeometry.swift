@@ -9,6 +9,13 @@ enum Layout: UInt32, CaseIterable {
 struct WindowGeometry {
     private var cycle: [Layout: Int] = [:]
 
+    mutating func apply(_ layout: Layout, usable: CGRect, setFrame: (CGRect) throws -> Void) rethrows {
+        var next = self
+        let frame = next.targetFrame(for: layout, usable: usable)
+        try setFrame(frame)
+        self = next
+    }
+
     mutating func targetFrame(for layout: Layout, usable: CGRect) -> CGRect {
         switch layout {
         case .one:

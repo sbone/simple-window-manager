@@ -29,6 +29,8 @@ The initial implementation is a dependency-free Swift package in `Package.swift`
 
 **Stable signing verified — 2026-09-28:** this Mac now uses its existing Quality Time Studio Developer ID certificate, selected by git-ignored `.codesign-identity`. Missing signing configuration fails explicitly; ad-hoc signing is opt-in. After the user granted access to the signed debug app, a rebuild as universal release retained Accessibility permission. `make check-accessibility` reported allowed before and after; the binary hashes differed and the designated requirements matched. Ordinary `make run` and `make release` reuse the saved identity. See the [README signing workflow](README.md#configure-signing-once-per-mac).
 
+**Failure reporting update — 2026-09-28:** `OL!` and menu details now report shortcut-registration and window-control failures. Accessibility errors and returned value types are checked; known non-resizable windows are rejected before movement, partial move/resize failures are explained, and failed layout attempts preserve cycle state. Exclusive Carbon registration identifies reported conflicts without preventing other shortcut registrations. Twenty-four automated tests pass, including fifteen tests with injected failure results. A native second-process probe confirmed Carbon rejects duplicate registrations for all five shortcuts with `eventHotKeyExistsErr`; the signed universal app retained Accessibility access. Actual GUI feedback and post-resize frame read-back remain integration work.
+
 ## Goal
 
 Reverse-engineer the behavior and implementation approach of the legacy macOS app **Optimal Layout 2.3.2** so we can build a clean-room replacement for **macOS 14+**, supporting both:

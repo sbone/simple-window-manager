@@ -61,6 +61,28 @@ the generated app. Focus a normal resizable window before trying a shortcut.
 Cycles are shared across windows and reset when the app restarts. Quit the
 legacy Optimal Layout or other apps using these shortcuts before testing.
 
+## Failure feedback
+
+When a window command fails, OL beeps and changes its menu-bar label to **OL!**.
+Open **Window Command Failed…** in the menu for the reason and recovery advice;
+the same details appear in the menu-bar tooltip. Feedback covers no active app
+or focused window, invalid window data, unavailable displays, a single-display
+Switch Display attempt, unsupported movement/resizing, and Accessibility API
+failures. If moving succeeds but resizing fails, the message says the window
+was partially changed. A failed layout does not advance its half/quadrant cycle.
+
+Shortcut registration requests exclusive Carbon hotkeys. When macOS reports a
+conflict or registration error, **OL! → Shortcut Problems…** identifies the
+exact shortcut. Other shortcuts continue registering, and menu commands remain
+available. Resolve the conflict and restart OL to retry registration. Exclusive
+registration detects conflicts reported by Carbon; it cannot detect every
+third-party event tap or shortcut interception mechanism.
+
+A successful window command clears the last window error. Shortcut problems
+remain visible until a restart registers them successfully. Window errors do
+not open dialogs or steal focus automatically; details open only when requested.
+The existing Accessibility-permission dialog still offers **Open Settings**.
+
 ## Build commands
 
 ```sh
@@ -127,9 +149,10 @@ passed for the rebuilt app.
 make test      # Or: swift test
 ```
 
-Nine tests use Swift Testing (included with the toolchain), with no added
-dependencies or Accessibility permission. They exercise the same geometry code
-used by the app without launching it or moving any real windows:
+Twenty-four tests use Swift Testing (included with the toolchain), with no added
+dependencies or Accessibility permission. Nine exercise the same geometry code
+used by the app; fifteen cover failures using injected Accessibility/Carbon
+results. They do not launch the app, move real windows, or register real shortcuts:
 
 - Full and centered layouts within usable bounds, including offset displays.
 - Half and quadrant cycle order, wrapping, independent state, and session reset.
@@ -142,6 +165,20 @@ used by the app without launching it or moving any real windows:
 These tests reproduced and now guard against two bugs: a vertically stacked
 display shifting the coordinate origin, and a spanning window selecting the
 first intersecting display instead of the largest overlap.
+
+Failure coverage includes absent or malformed focused windows, denied or failed
+Accessibility queries, invalid frames, non-settable sizes checked before moving,
+failed position writes stopping resize, partial move/resize failures, correct AX
+value writes, cycle preservation on failure, exclusive shortcut registration,
+continuing after one shortcut conflicts, unexpected registration failures, and
+retaining shortcut warnings after successful window commands.
+
+**Runtime validation — 2026-09-28:** a separate temporary probe attempted all
+five exclusive shortcuts while the signed app was running. Carbon returned
+`eventHotKeyExistsErr` (`-9878`) for each, and the production registration code
+reported the correct combination. The probe sent no keystrokes or window
+commands. The signed universal build passed verification and retained
+Accessibility access. GUI warning presentation still needs an integration test.
 
 ### Next automation layer
 
@@ -157,8 +194,8 @@ cycle state before each complete run.
 | --- | --- |
 | Shortcuts and menu actions | Drive the running app and compare actual window frames with expected placements. |
 | Switch Display | Use connected displays, check transfer in both directions and wraparound; skip explicitly if only one display is connected. |
-| Shortcut conflicts | Reserve a shortcut before launching OL and check that OL reports the registration failure; reporting is not implemented yet. |
-| Accessibility failures | Test permission-denied and rejected-resize results once error reporting exists, plus an opt-in check with real macOS permissions. |
+| Shortcut conflicts | Reserve a shortcut before launching OL and check the actual menu warning; injected registration-failure tests already pass. |
+| Accessibility failures | Exercise real denied/rejected operations and check the menu feedback; injected failure tests already pass. |
 | Launch at login | After implementation, verify registration state and separately verify launch in a fresh login session. |
 
 The GUI harness will need a logged-in macOS desktop and Accessibility permission
@@ -180,9 +217,11 @@ On 2026-09-28, the user confirmed successful VS Code window adjustment on the
 M4 MacBook Air. Cycle calculations now have automated coverage; complete
 shortcut delivery and the remaining GUI smoke tests above have not yet been confirmed.
 
-Window behavior is still a prototype: multi-display geometry, Accessibility
-errors, shortcut conflicts, and non-resizable/full-screen windows need runtime
-validation. Preferences and launch at login are not implemented yet.
+Window behavior is still a prototype: physical multi-display behavior, failure
+feedback, shortcut conflicts, and non-resizable/full-screen windows need GUI
+validation. The app checks API results but does not yet read the resulting frame
+back: an app can report success while constraining the requested size. Preferences
+and launch at login are not implemented yet.
 
 ## Design and investigation
 

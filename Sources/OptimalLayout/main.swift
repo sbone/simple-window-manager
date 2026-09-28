@@ -5,76 +5,59 @@ import Carbon.HIToolbox
 @MainActor
 private final class WindowController {
     private var geometry = WindowGeometry()
+    private let access = WindowAccess()
 
-    func apply(_ layout: Layout) {
-        guard let window = focusedWindow(), let screen = screen(for: window) else { return }
-        let frame = geometry.targetFrame(for: layout, usable: screen.visibleFrame)
-        setFrame(frame, on: window)
+    func apply(_ layout: Layout) throws {
+        let window = try access.focusedWindow(processIdentifier: NSWorkspace.shared.frontmostApplication?.processIdentifier)
+        let frame = try appKitFrame(of: window)
+        let screen = try screen(for: frame)
+        try geometry.apply(layout, usable: screen.visibleFrame) { target in
+            try access.setFrame(WindowGeometry.flippedFrame(target, screens: NSScreen.screens.map(\.frame)), on: window)
+        }
     }
 
-    func switchDisplay() {
-        guard let window = focusedWindow(), let current = screen(for: window) else { return }
+    func switchDisplay() throws {
+        let window = try access.focusedWindow(processIdentifier: NSWorkspace.shared.frontmostApplication?.processIdentifier)
+        let oldFrame = try appKitFrame(of: window)
+        let current = try screen(for: oldFrame)
         let screens = NSScreen.screens
-        guard screens.count > 1, let index = screens.firstIndex(of: current) else { return }
+        guard screens.count > 1 else { throw WindowFailure.onlyOneDisplay }
+        guard let index = screens.firstIndex(of: current) else { throw WindowFailure.noDisplay }
         let next = screens[(index + 1) % screens.count]
-        let oldFrame = appKitFrame(of: window)
-        let frame = WindowGeometry.movedFrame(oldFrame, from: current.visibleFrame, to: next.visibleFrame)
-        setFrame(frame, on: window)
+        let target = WindowGeometry.movedFrame(oldFrame, from: current.visibleFrame, to: next.visibleFrame)
+        try access.setFrame(WindowGeometry.flippedFrame(target, screens: screens.map(\.frame)), on: window)
     }
 
-    private func focusedWindow() -> AXUIElement? {
-        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
-        let element = AXUIElementCreateApplication(app.processIdentifier)
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &value) == .success else { return nil }
-        return (value as! AXUIElement)
-    }
-
-    private func screen(for window: AXUIElement) -> NSScreen? {
-        let frame = appKitFrame(of: window)
+    private func screen(for frame: CGRect) throws -> NSScreen {
         let screens = NSScreen.screens
-        guard let index = WindowGeometry.screenIndex(for: frame, screens: screens.map(\.frame)) else { return NSScreen.main }
-        return screens[index]
+        if let index = WindowGeometry.screenIndex(for: frame, screens: screens.map(\.frame)) { return screens[index] }
+        guard let screen = NSScreen.main else { throw WindowFailure.noDisplay }
+        return screen
     }
 
-    private func accessibilityFrame(of window: AXUIElement) -> CGRect {
-        var position: CFTypeRef?
-        var size: CFTypeRef?
-        AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &position)
-        AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &size)
-        var point = CGPoint.zero
-        var dimensions = CGSize.zero
-        if let position { AXValueGetValue(position as! AXValue, .cgPoint, &point) }
-        if let size { AXValueGetValue(size as! AXValue, .cgSize, &dimensions) }
-        return CGRect(origin: point, size: dimensions)
-    }
-
-    private func appKitFrame(of window: AXUIElement) -> CGRect {
-        let frame = accessibilityFrame(of: window)
-        return WindowGeometry.flippedFrame(frame, screens: NSScreen.screens.map(\.frame))
-    }
-
-    private func setFrame(_ frame: CGRect, on window: AXUIElement) {
-        var point = WindowGeometry.flippedFrame(frame, screens: NSScreen.screens.map(\.frame)).origin
-        var size = frame.size
-        guard let position = AXValueCreate(.cgPoint, &point), let dimensions = AXValueCreate(.cgSize, &size) else { return }
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, position)
-        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, dimensions)
+    private func appKitFrame(of window: AXUIElement) throws -> CGRect {
+        WindowGeometry.flippedFrame(try access.frame(of: window), screens: NSScreen.screens.map(\.frame))
     }
 }
 
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windows = WindowController()
-    private var hotkeys: [EventHotKeyRef?] = []
+    private var hotkeys: [EventHotKeyRef] = []
+    private var eventHandler: EventHandlerRef?
     private var statusItem: NSStatusItem!
     private var showingPermissionAlert = false
+    private var problems = AppProblems()
+    private let problemItem = NSMenuItem(title: "Show Problems…", action: #selector(showProblems), keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "OL"
         let menu = NSMenu()
+        problemItem.target = self
+        problemItem.isHidden = true
+        menu.addItem(problemItem)
         for layout in Layout.allCases {
             let item = menu.addItem(withTitle: layout.title, action: #selector(apply(_:)), keyEquivalent: "")
             item.target = self
@@ -126,32 +109,63 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
             return
         }
-        if let layout = Layout(rawValue: id) { windows.apply(layout) }
-        if id == 0 { windows.switchDisplay() }
+        do {
+            if let layout = Layout(rawValue: id) { try windows.apply(layout) }
+            if id == 0 { try windows.switchDisplay() }
+            problems.windowFailure = nil
+        } catch {
+            problems.windowFailure = error.localizedDescription
+            NSLog("Window command %u failed: %@", id, String(describing: error))
+            NSSound.beep()
+        }
+        updateProblems()
+    }
+
+    private func updateProblems() {
+        let messages = problems.messages
+        statusItem.button?.title = messages.isEmpty ? "OL" : "OL!"
+        statusItem.button?.toolTip = messages.isEmpty ? "Optimal Layout" : messages.joined(separator: "\n\n")
+        problemItem.isHidden = messages.isEmpty
+        problemItem.title = problems.windowFailure == nil ? "Shortcut Problems…" : "Window Command Failed…"
+    }
+
+    @objc private func showProblems() {
+        let previousApp = NSWorkspace.shared.frontmostApplication
+        let alert = NSAlert()
+        alert.messageText = "Optimal Layout needs attention"
+        alert.informativeText = problems.messages.joined(separator: "\n\n")
+        NSApp.activate()
+        alert.runModal()
+        previousApp?.activate(options: [])
     }
 
     private func installHotkeys() {
         let type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
+        let handlerResult = InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
             guard let event, let userData else { return noErr }
             let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
             var id = EventHotKeyID()
-            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+            let result = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+            guard result == noErr, id.signature == Shortcut.signature else { return OSStatus(eventNotHandledErr) }
             // Application event-target callbacks run on the main event loop.
             MainActor.assumeIsolated { delegate.performAction(id.id) }
             return noErr
-        }, 1, [type], Unmanaged.passUnretained(self).toOpaque(), nil)
-
-        for layout in Layout.allCases {
-            var ref: EventHotKeyRef?
-            let id = EventHotKeyID(signature: OSType(0x4F4C0000), id: layout.rawValue)
-            RegisterEventHotKey(UInt32(18 + layout.rawValue - 1), UInt32(cmdKey | optionKey), id, GetApplicationEventTarget(), 0, &ref)
-            hotkeys.append(ref)
+        }, 1, [type], Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
+        guard handlerResult == noErr else {
+            problems.shortcutFailures = ["Global shortcuts could not start (macOS error \(handlerResult)). Restart OL. Menu commands are still available."]
+            updateProblems()
+            return
         }
-        var displayRef: EventHotKeyRef?
-        let displayID = EventHotKeyID(signature: OSType(0x4F4C0000), id: 0)
-        RegisterEventHotKey(29, UInt32(cmdKey | optionKey), displayID, GetApplicationEventTarget(), 0, &displayRef)
-        hotkeys.append(displayRef)
+        let registration = Shortcut.registerAll()
+        hotkeys = registration.references
+        problems.shortcutFailures = registration.failures
+        for failure in registration.failures { NSLog("Shortcut registration failed: %@", failure) }
+        updateProblems()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        for hotkey in hotkeys { UnregisterEventHotKey(hotkey) }
+        if let eventHandler { RemoveEventHandler(eventHandler) }
     }
 }
 
