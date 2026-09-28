@@ -120,9 +120,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let switchItem = menu.addItem(withTitle: "Switch Display", action: #selector(switchDisplay), keyEquivalent: "")
         switchItem.target = self
         menu.addItem(.separator())
+        let accessibilityItem = menu.addItem(withTitle: "Enable Accessibility…", action: #selector(requestAccessibility), keyEquivalent: "")
+        accessibilityItem.target = self
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
         installHotkeys()
+        requestAccessibility()
+    }
+
+    @objc private func requestAccessibility() {
+        // The SDK imports the equivalent C constant as shared mutable state.
+        let options = ["AXTrustedCheckOptionPrompt": true]
+        AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
     @objc private func apply(_ sender: NSMenuItem) {
@@ -146,18 +155,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         for layout in Layout.allCases {
             var ref: EventHotKeyRef?
-            var id = EventHotKeyID(signature: OSType(0x4F4C0000), id: layout.rawValue)
+            let id = EventHotKeyID(signature: OSType(0x4F4C0000), id: layout.rawValue)
             RegisterEventHotKey(UInt32(18 + layout.rawValue - 1), UInt32(cmdKey | optionKey), id, GetApplicationEventTarget(), 0, &ref)
             hotkeys.append(ref)
         }
         var displayRef: EventHotKeyRef?
-        var displayID = EventHotKeyID(signature: OSType(0x4F4C0000), id: 0)
+        let displayID = EventHotKeyID(signature: OSType(0x4F4C0000), id: 0)
         RegisterEventHotKey(29, UInt32(cmdKey | optionKey), displayID, GetApplicationEventTarget(), 0, &displayRef)
         hotkeys.append(displayRef)
     }
 }
 
 let app = NSApplication.shared
-let delegate = AppDelegate()
+private let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

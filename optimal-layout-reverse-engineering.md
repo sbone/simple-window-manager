@@ -176,7 +176,7 @@ The first implementation should contain only:
 6. A minimal menu-bar menu and preferences window.
 7. Universal `arm64`/`x86_64` build.
 
-The next engineering task is to implement the smallest vertical slice: one built-in layout, one global shortcut, one focused-window move/resize operation, and a manual test on one and two displays. The fourth command should be implemented as the quadrant-cycle state machine described above. After that works, add the remaining built-in commands and menu preferences.
+The initial vertical slice and all four built-in commands are implemented. The next step is to validate complete layout cycles, menu commands, and one- and two-display behavior, then address window-control errors and shortcut conflicts before adding preferences.
 
 ## Implementation Progress
 
@@ -193,4 +193,10 @@ The first slice includes:
 - frame updates through Accessibility position and size attributes;
 - next-display movement preserving the current relative position.
 
-The package has not yet been run on a real window. Local `swift build` is currently blocked by a Swift 6.2.4 / SDK 6.2.3 toolchain mismatch and restricted SwiftPM cache directories. The next validation step is to build with a matching Xcode toolchain, grant Accessibility access, and test the four commands against a resizable window on one and two displays.
+**Confirmed by build validation — 2026-09-28, M4 MacBook Air:** native debug and universal release builds now pass with Xcode 26.3, Swift 6.2.4, and the macOS 26.2 SDK on macOS 15.8. The former toolchain blocker no longer reproduces. Sandboxed builds still require access to Swift's user cache directories.
+
+`make build` packages a native debug app; `make release` packages an optimized universal app. Both produce an ad-hoc-signed `Optimal Layout.app` with a separate development bundle identifier, `local.OptimalLayout`. Binary inspection confirms both `arm64` and `x86_64` slices target macOS 14.0, and strict code-signature verification passes. The app now requests Accessibility access at launch and from its menu. See [README.md](README.md) for setup and a manual smoke test.
+
+**Confirmed by runtime behavior — user-reported, 2026-09-28:** the replacement app successfully adjusts a VS Code window on the M4 MacBook Air. This validates the initial window-control path in a real application. The report does not specify which commands were exercised, so complete cycle order, menu-bar/Dock clearance, other applications, and multi-display behavior remain unverified.
+
+The current Switch Display prototype preserves absolute size and proportional position; this differs from the proportional-size candidate above and does not establish the legacy app's behavior. Preferences, launch at login, shortcut conflict reporting, and distribution signing/notarization remain outstanding.

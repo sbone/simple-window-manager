@@ -13,9 +13,13 @@ Confirmed so far:
 
 The replacement scope is now intentionally smaller: four built-in layout commands shown in the menu, global shortcuts, focused-window move/resize, next-display movement, Accessibility onboarding, and a minimal menu-bar/preferences UI. Users will not define custom window shapes or sizes, and layouts will not be assigned to specific applications. Every command applies to the currently focused eligible window. `⌘⌥2` cycles left half → right half → left half. `⌘⌥4` cycles upper-left → upper-right → lower-right → lower-left → upper-left. Each command starts its cycle at the first position on its initial press. Window browsing, grid navigation, incremental movement/resizing, tab handling, ignored-window configuration, Growl, TotalFinder, crash reporting, and update infrastructure are legacy reference behavior rather than MVP requirements.
 
-The next investigation step is runtime verification of screen-frame semantics and Switch Display behavior, followed by a minimal vertical-slice implementation.
+The next investigation step is runtime verification of screen-frame semantics and Switch Display behavior in the replacement.
 
-That implementation has now started as a dependency-free Swift package in `Package.swift` and `Sources/OptimalLayout/main.swift`. It contains the menu-bar entry point, built-in layout cycles, Carbon hotkeys, Accessibility focused-window lookup, and initial multi-display movement logic. Runtime verification remains outstanding.
+The initial implementation is a dependency-free Swift package in `Package.swift` and `Sources/OptimalLayout/main.swift`. It contains the menu-bar entry point, built-in layout cycles, Carbon hotkeys, Accessibility focused-window lookup, and initial multi-display movement logic.
+
+**Toolchain update — M4 MacBook Air:** Xcode 26.3 / Swift 6.2.4 now builds the app successfully. Native debug and universal `arm64`/`x86_64` release packaging are available via `make build` and `make release`; `make run` builds and launches the app. The packaged app has verified ad-hoc signing, a macOS 14 minimum, and Accessibility permission prompting. Start with [README.md](README.md) for the current development workflow.
+
+**Confirmed by runtime behavior — user-reported:** on 2026-09-28, the replacement successfully adjusted a VS Code window on the M4 MacBook Air. Complete layout cycles, menu commands, other applications, and multi-display behavior still need testing. Next, validate those paths and address window-control errors and shortcut conflicts before expanding the UI.
 
 ## Goal
 
