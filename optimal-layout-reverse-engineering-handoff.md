@@ -35,6 +35,8 @@ The initial implementation is a dependency-free Swift package in `Package.swift`
 
 **Physical two-display verification — 2026-09-28:** after the user connected a second monitor via HDMI through a USB hub, `make smoke-test` detected two displays and passed all 29 checks with zero skips. The real ⌘⌥0 shortcut moved the fixture to display index 1; the Switch Display menu command wrapped back to index 0. Its 400 × 250-point size and relative position were preserved within the 2-point tolerance. This supersedes the earlier one-display skip for this connected arrangement. Other arrangements and third-party window constraints remain unverified.
 
+**Launch at Login implemented — 2026-09-28:** the OL menu now uses `SMAppService.mainApp` to register/unregister the main app for the current account. Menu state is refreshed from macOS on opening; pending approval gets a mixed state and a System Settings link, and errors get a dialog. The opt-in `bash scripts/smoke-test.sh --login-item` verifies toggling and persistence after app restarts, restoring the original registration. All 31 GUI checks passed on two displays, all 24 unit tests passed, and the universal release build passed. Actual startup after logout/reboot and approval/error UI paths still need manual verification. See [Launch at Login](README.md#launch-at-login).
+
 ## Goal
 
 Reverse-engineer the behavior and implementation approach of the legacy macOS app **Optimal Layout 2.3.2** so we can build a clean-room replacement for **macOS 14+**, supporting both:

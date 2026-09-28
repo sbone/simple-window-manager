@@ -13,6 +13,7 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var reservedHotkey: EventHotKeyRef?
     private var cancelled = false
     private var cleaningUp = false
+    private var restoringLoginItem = false
     private var passed = 0
     private var skipped = 0
     private var appURL: URL!
@@ -33,7 +34,9 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc private func stop() { cancelled = true }
 
     private func run() async {
-        guard CommandLine.arguments.count == 2 else { finish("FAIL: expected the OL app path", code: 1); return }
+        guard CommandLine.arguments.count == 2 || (CommandLine.arguments.count == 3 && CommandLine.arguments[2] == "--login-item") else {
+            finish("FAIL: expected the OL app path and optional --login-item", code: 1); return
+        }
         appURL = URL(fileURLWithPath: CommandLine.arguments[1])
         guard AXIsProcessTrusted() else {
             AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
@@ -53,6 +56,7 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
             try await windowWarning()
             try await shortcutWarning()
             try await displayTransfers()
+            if CommandLine.arguments.contains("--login-item") { try await loginItem() }
         } catch {
             failure = error
             report("FAIL: \(error)")
@@ -67,6 +71,37 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func finish(_ message: String, code: Int32) { report(message); exit(code) }
+
+    private func loginItem() async throws {
+        try await restartOL()
+        try await focus()
+        let original = try await UI.menu(pid: ol!.processIdentifier, title: "Launch at Login", inspectOnly: true)
+        guard original == "" || original == "✓" else { throw SmokeFailure("Launch at Login needs approval; resolve it in System Settings before testing") }
+        var failure: Error?
+        do {
+            try await UI.menu(pid: ol!.processIdentifier, title: "Launch at Login")
+            try await restartOL()
+            try await focus()
+            let changed = try await UI.menu(pid: ol!.processIdentifier, title: "Launch at Login", inspectOnly: true)
+            guard changed == (original.isEmpty ? "✓" : "") else { throw SmokeFailure("Launch at Login did not persist its changed state after restart: \(changed)") }
+            passed += 1
+            report("PASS Launch at Login toggles and persists after app restart")
+        } catch { failure = error }
+        // Restore the user's original registration even if the assertion failed.
+        restoringLoginItem = true
+        defer { restoringLoginItem = false }
+        try await focus()
+        let current = try await UI.menu(pid: ol!.processIdentifier, title: "Launch at Login", inspectOnly: true)
+        if current != original { try await UI.menu(pid: ol!.processIdentifier, title: "Launch at Login") }
+        try await restartOL()
+        try await focus()
+        let restored = try await UI.menu(pid: ol!.processIdentifier, title: "Launch at Login", inspectOnly: true)
+        guard restored == original else { throw SmokeFailure("Could not restore Launch at Login; check OL's menu") }
+        if let failure { throw failure }
+        if cancelled { throw SmokeFailure("Cancelled by user") }
+        passed += 1
+        report("PASS Launch at Login restored and persisted after app restart")
+    }
 
     private func makeWindow() {
         window = NSWindow(contentRect: CGRect(x: 100, y: 100, width: 420, height: 280),
@@ -87,7 +122,7 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func wait(_ description: String, checkCancellation: Bool = true, until condition: () async throws -> Bool) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(4))
         repeat {
-            if checkCancellation && cancelled { throw SmokeFailure("Cancelled by user") }
+            if checkCancellation && cancelled && !restoringLoginItem { throw SmokeFailure("Cancelled by user") }
             if try await condition() { return }
             try await Task.sleep(for: .milliseconds(50))
         } while ContinuousClock.now < deadline

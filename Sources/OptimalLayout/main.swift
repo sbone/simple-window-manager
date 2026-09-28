@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
+import ServiceManagement
 
 @MainActor
 private final class WindowController {
@@ -41,7 +42,7 @@ private final class WindowController {
 }
 
 @MainActor
-private final class AppDelegate: NSObject, NSApplicationDelegate {
+private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let windows = WindowController()
     private var hotkeys: [EventHotKeyRef] = []
     private var eventHandler: EventHandlerRef?
@@ -49,12 +50,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var showingPermissionAlert = false
     private var problems = AppProblems()
     private let problemItem = NSMenuItem(title: "Show Problems…", action: #selector(showProblems), keyEquivalent: "")
+    private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+    private let loginSettingsItem = NSMenuItem(title: "Approve Launch at Login…", action: #selector(openLoginSettings), keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "OL"
         let menu = NSMenu()
+        menu.delegate = self
         problemItem.target = self
         problemItem.isHidden = true
         menu.addItem(problemItem)
@@ -69,10 +73,46 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let accessibilityItem = menu.addItem(withTitle: "Accessibility Settings…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
+        loginItem.target = self
+        loginSettingsItem.target = self
+        menu.addItem(loginItem)
+        menu.addItem(loginSettingsItem)
+        updateLoginItem()
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
         installHotkeys()
         requestAccessibility()
+    }
+
+    func menuWillOpen(_ menu: NSMenu) { updateLoginItem() }
+
+    private func updateLoginItem() {
+        let status = SMAppService.mainApp.status
+        loginItem.state = status == .enabled ? .on : status == .requiresApproval ? .mixed : .off
+        loginSettingsItem.isHidden = status != .requiresApproval
+    }
+
+    @objc private func openLoginSettings() { SMAppService.openSystemSettingsLoginItems() }
+
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            switch SMAppService.mainApp.status {
+            case .enabled, .requiresApproval:
+                try SMAppService.mainApp.unregister()
+            default:
+                try SMAppService.mainApp.register()
+                if SMAppService.mainApp.status == .requiresApproval { openLoginSettings() }
+            }
+        } catch {
+            let previousApp = NSWorkspace.shared.frontmostApplication
+            let alert = NSAlert()
+            alert.messageText = "Launch at Login could not be changed"
+            alert.informativeText = error.localizedDescription
+            NSApp.activate()
+            alert.runModal()
+            previousApp?.activate(options: [])
+        }
+        updateLoginItem()
     }
 
     @objc private func requestAccessibility() {

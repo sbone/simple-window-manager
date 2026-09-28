@@ -54,7 +54,8 @@ enum UI {
     }
 
     @concurrent
-    static func menu(pid: pid_t, title: String) async throws {
+    @discardableResult
+    static func menu(pid: pid_t, title: String, inspectOnly: Bool = false) async throws -> String {
         let app = AXUIElementCreateApplication(pid)
         guard let item = statusItem(app) else { throw SmokeFailure("OL's status item is missing from Accessibility") }
         try press(item)
@@ -67,8 +68,17 @@ enum UI {
                     NSWorkspace.shared.frontmostApplication?.processIdentifier == ProcessInfo.processInfo.processIdentifier
                 }
                 guard ownsFocus else { throw SmokeFailure("Test window lost focus; refusing to invoke \(title)") }
-                try press(command)
-                return
+                let mark = value(command, kAXMenuItemMarkCharAttribute) as? String ?? ""
+                if inspectOnly {
+                    guard let parent = value(command, kAXParentAttribute), CFGetTypeID(parent) == AXUIElementGetTypeID() else {
+                        throw SmokeFailure("Menu parent is missing")
+                    }
+                    let result = AXUIElementPerformAction(parent as! AXUIElement, kAXCancelAction as CFString)
+                    guard result == .success else { throw SmokeFailure("Could not close inspected menu: \(result.rawValue)") }
+                } else {
+                    try press(command)
+                }
+                return mark
             }
             try await Task.sleep(for: .milliseconds(50))
         } while ContinuousClock.now < deadline

@@ -35,6 +35,6 @@ codesign --verify --strict "$helper"
 make check-accessibility
 > .build/smoke-test.log
 echo "The test uses its own windows. Leave the keyboard and mouse idle until it finishes."
-open -n -W "$helper" --stdout "$PWD/.build/smoke-test.log" --stderr "$PWD/.build/smoke-test-stderr.log" --args "$PWD/Optimal Layout.app"
+open -n -W "$helper" --stdout "$PWD/.build/smoke-test.log" --stderr "$PWD/.build/smoke-test-stderr.log" --args "$PWD/Optimal Layout.app" "$@"
 cat .build/smoke-test.log
 grep -qx 'RESULT PASS' .build/smoke-test.log

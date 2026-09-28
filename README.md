@@ -239,6 +239,37 @@ wrapped back to index 0. Both preserved size and relative position within the
 2-point tolerance. This verifies the connected arrangement; other arrangements
 and third-party window constraints remain to validate.
 
+## Launch at Login
+
+Choose **OL → Launch at Login** to enable or disable automatic startup for your
+macOS account. A checkmark means enabled; a dash means macOS requires approval.
+Use **Approve Launch at Login…** to open System Settings in that case. Clicking
+the pending toggle cancels the registration. Errors appear in a dialog.
+
+OL uses Apple's [SMAppService.mainApp](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp).
+The menu reads the current system status whenever it opens, including changes
+made in System Settings → General → Login Items. There is no separate saved
+preference and OL does not register itself automatically on ordinary launch.
+Keep the registered app at a stable location; this development setup uses the
+repo's `Optimal Layout.app`. Rebuilding in place keeps that path.
+
+The optional integration test changes the real login setting, checks it after
+restarting OL, and restores the original setting:
+
+```sh
+bash scripts/smoke-test.sh --login-item
+```
+
+This runs the normal GUI suite plus the login-item checks. Resolve pending macOS
+approval before running it. It tests registration and persistence across app
+restarts; actual launch after logging out or restarting the Mac is a separate
+manual check. A force-killed test may require restoring the setting in OL's menu.
+
+**Verified on 2026-09-28:** all 31 GUI checks passed on two displays, including
+login-item toggling and restoration across app restarts. All 24 unit tests and
+the universal release build also pass. Approval-required and registration-error
+dialog paths have not been exercised on this Mac.
+
 ## Manual smoke test
 
 1. Launch the app and verify **OL** appears in the menu bar.
@@ -256,8 +287,8 @@ and applications' edge cases remain.
 
 Window behavior is still a prototype: additional display arrangements and
 third-party/full-screen window constraints still need validation. The app checks API results but does not yet read the resulting frame
-back: an app can report success while constraining the requested size. Preferences
-and launch at login are not implemented yet.
+back: an app can report success while constraining the requested size. A Preferences
+window is not implemented yet; Launch at Login is available directly in the menu.
 
 ## Design and investigation
 
