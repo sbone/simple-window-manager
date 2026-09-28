@@ -232,6 +232,13 @@ first run also correctly reported missing permission and restored OL. These
 checks cover the controlled AppKit test window, not every application's sizing
 constraints or every display arrangement.
 
+**Two-display verification — 2026-09-28:** after connecting a second monitor via
+HDMI through a USB hub, all 29 GUI checks passed with zero skips. ⌘⌥0 moved the
+400 × 250-point fixture to display index 1; the Switch Display menu command
+wrapped back to index 0. Both preserved size and relative position within the
+2-point tolerance. This verifies the connected arrangement; other arrangements
+and third-party window constraints remain to validate.
+
 ## Manual smoke test
 
 1. Launch the app and verify **OL** appears in the menu bar.
@@ -244,9 +251,10 @@ constraints or every display arrangement.
 
 On 2026-09-28, the user confirmed successful VS Code window adjustment on the
 M4 MacBook Air. Cycle calculations now have automated coverage; shortcut and menu delivery plus warning presentation now pass the automated GUI
-harness. Physical multi-display behavior and other applications' edge cases remain.
+harness. A two-display transfer and wraparound also pass; other display arrangements
+and applications' edge cases remain.
 
-Window behavior is still a prototype: physical multi-display behavior and
+Window behavior is still a prototype: additional display arrangements and
 third-party/full-screen window constraints still need validation. The app checks API results but does not yet read the resulting frame
 back: an app can report success while constraining the requested size. Preferences
 and launch at login are not implemented yet.

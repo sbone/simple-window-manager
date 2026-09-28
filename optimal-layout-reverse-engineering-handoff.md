@@ -33,6 +33,8 @@ The initial implementation is a dependency-free Swift package in `Package.swift`
 
 **GUI integration verified — 2026-09-28:** `make smoke-test` now builds a separately signed AppKit helper with its own Accessibility grant. Two complete runs passed 27 checks: actual keyboard and menu placement cycles, unchanged geometry for a rejected resize, warning indicators and dialogs, cycle-preserving retry, real shortcut conflict presentation, unaffected shortcuts, and menu fallback. The helper observes its own window frame against independent expectations and restores normal OL afterward. The focus-guard rerun also passed; 24 unit tests remain green. Multi-display movement was explicitly skipped because macOS exposed one display. See the [GUI smoke-test instructions](README.md#gui-smoke-test). Physical multi-display operation and third-party window constraints remain to validate; production frame read-back is still outstanding.
 
+**Physical two-display verification — 2026-09-28:** after the user connected a second monitor via HDMI through a USB hub, `make smoke-test` detected two displays and passed all 29 checks with zero skips. The real ⌘⌥0 shortcut moved the fixture to display index 1; the Switch Display menu command wrapped back to index 0. Its 400 × 250-point size and relative position were preserved within the 2-point tolerance. This supersedes the earlier one-display skip for this connected arrangement. Other arrangements and third-party window constraints remain unverified.
+
 ## Goal
 
 Reverse-engineer the behavior and implementation approach of the legacy macOS app **Optimal Layout 2.3.2** so we can build a clean-room replacement for **macOS 14+**, supporting both:
