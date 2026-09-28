@@ -8,15 +8,25 @@ case "${1:-debug}" in
     *) echo "Usage: $0 [debug|release]" >&2; exit 2 ;;
 esac
 
+signing_identity=${CODE_SIGN_IDENTITY:-}
+if [ -z "$signing_identity" ] && [ -f .codesign-identity ]; then
+    signing_identity=$(cat .codesign-identity)
+fi
+if [ -z "$signing_identity" ]; then
+    echo "Choose a code-signing identity in .codesign-identity or CODE_SIGN_IDENTITY; see README.md." >&2
+    echo "For an explicit ad-hoc build, use CODE_SIGN_IDENTITY=- (Accessibility may reset)." >&2
+    exit 1
+fi
+
 swift build "${build_args[@]}"
 bin_dir=$(swift build "${build_args[@]}" --show-bin-path)
 app="Optimal Layout.app"
 mkdir -p "$app/Contents/MacOS"
 cp "$bin_dir/OptimalLayout" "$app/Contents/MacOS/OptimalLayout"
 cp Resources/Info.plist "$app/Contents/Info.plist"
-codesign --force --sign "${CODE_SIGN_IDENTITY:--}" "$app"
+codesign --force --sign "$signing_identity" "$app"
 codesign --verify --strict "$app"
 echo "Built $PWD/$app"
-if [ "${CODE_SIGN_IDENTITY:--}" = "-" ]; then
+if [ "$signing_identity" = "-" ]; then
     echo "Ad-hoc signing: after code changes, remove and re-add this app in Accessibility settings."
 fi

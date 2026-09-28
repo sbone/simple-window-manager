@@ -23,9 +23,11 @@ The initial implementation is a dependency-free Swift package in `Package.swift`
 
 **Automated validation update — 2026-09-28:** `make test` runs nine passing Swift Testing tests of the production geometry code. They cover cycle order/reset, usable bounds, fractional sizes, display transfer, coordinate conversion, and display selection. Regression tests reproduced and fixes resolved the vertically stacked-display coordinate offset and first-overlap display-selection bugs. Real shortcut/menu delivery and physical multi-display behavior still need GUI integration checks; see the [README automation plan](README.md#next-automation-layer).
 
-**Rebuild/permissions finding — 2026-09-28:** the user's `make run` invalidated the previous Accessibility grant: macOS logs show a code-requirement mismatch for `local.OptimalLayout`. Both shortcut and menu actions consequently stopped working. See [README recovery steps](README.md#commands-stop-working-after-a-rebuild). Commands now share a trust check with recovery feedback, and builds accept `CODE_SIGN_IDENTITY` for a stable signing certificate. The default remains ad-hoc signing.
+**Rebuild/permissions finding — 2026-09-28:** the user's `make run` invalidated the previous Accessibility grant: macOS logs show a code-requirement mismatch for `local.OptimalLayout`. Both shortcut and menu actions consequently stopped working. See [README recovery steps](README.md#commands-stop-working-after-a-rebuild). Commands now share a trust check with recovery feedback, and builds accept `CODE_SIGN_IDENTITY` for a stable signing certificate.
 
-**Confirmed recovery — user-reported, 2026-09-28:** resetting Accessibility access restored window control. The permission failure and recovery are now verified; persistence across certificate-signed rebuilds remains untested.
+**Confirmed recovery — user-reported, 2026-09-28:** resetting Accessibility access restored window control.
+
+**Stable signing verified — 2026-09-28:** this Mac now uses its existing Quality Time Studio Developer ID certificate, selected by git-ignored `.codesign-identity`. Missing signing configuration fails explicitly; ad-hoc signing is opt-in. After the user granted access to the signed debug app, a rebuild as universal release retained Accessibility permission. `make check-accessibility` reported allowed before and after; the binary hashes differed and the designated requirements matched. Ordinary `make run` and `make release` reuse the saved identity. See the [README signing workflow](README.md#configure-signing-once-per-mac).
 
 ## Goal
 

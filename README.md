@@ -14,6 +14,27 @@ build script packages and locally signs the app.
   and open Xcode once to finish its setup.
 - No Homebrew packages or third-party dependencies are needed.
 
+## Configure signing once per Mac
+
+Choose an existing code-signing identity from your keychain and save its name
+or hash in the local configuration file:
+
+```sh
+security find-identity -v -p codesigning
+printf '%s\n' '<identity name or hash from the command above>' > .codesign-identity
+```
+
+`.codesign-identity` is git-ignored and stores only the identity reference; the
+private key stays in Keychain. This M4 Air is configured to use the existing
+**Developer ID Application: Quality Time Studio LLC** certificate. Ordinary
+`make build`, `make run`, and `make release` now use that same identity.
+
+`CODE_SIGN_IDENTITY` overrides the file when set. Missing configuration or an
+unusable identity causes the build to fail; there is no silent ad-hoc fallback.
+For a deliberately ad-hoc build, use `CODE_SIGN_IDENTITY=- make build`, knowing
+that code changes can invalidate Accessibility access. Certificate creation is
+not automated.
+
 ## Build and run
 
 ```sh
@@ -46,14 +67,13 @@ legacy Optimal Layout or other apps using these shortcuts before testing.
 swift build    # Compile the native executable only
 make build     # Package a native debug app without launching it
 make release   # Package an optimized universal arm64 + x86_64 app
+make check-accessibility # Check the packaged app's actual Accessibility grant
 ```
 
-Both packaging commands write the same `Optimal Layout.app`. These builds
-default to ad-hoc signing for local development; distribution signing and
-notarization are not configured. After code changes, the app's signing
-requirement changes and the previous Accessibility grant can stop matching.
-Prefer the bundled app over
-`swift run` so permissions apply to the app you will actually use.
+Both packaging commands write the same `Optimal Layout.app`, signed with the
+configured identity. Notarization and a distribution pipeline are not configured.
+Prefer the bundled app over `swift run` so permissions apply to the app you
+will actually use.
 
 ### Commands stop working after a rebuild
 
@@ -73,19 +93,33 @@ window control after this rebuild failure.
 Window commands now check Accessibility trust and explain how to recover if
 permission is missing. The OS permission grant still requires user action.
 
-To avoid changing the app's signing identity on each rebuild, use an existing
-code-signing certificate from your keychain:
+### Verify permission survives a rebuild
+
+Switching from the old ad-hoc build to certificate signing requires one final
+Accessibility grant using the recovery steps above. Thereafter, keep using the
+same certificate and bundle identifier. macOS uses the app's designated
+requirement to recognize updated builds; see Apple's
+[code-signing requirements explanation](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 
 ```sh
-security find-identity -v -p codesigning
-CODE_SIGN_IDENTITY="<identity name or hash from the command above>" make run
+make check-accessibility   # Must report Accessibility: allowed
+# Quit OL from the menu before replacing the app.
+make release               # Changes native debug into universal release
+make check-accessibility   # Should still report Accessibility: allowed
+open "Optimal Layout.app"
 ```
 
-Use the same identity for subsequent builds (for example, export
-`CODE_SIGN_IDENTITY` in your development shell). Grant Accessibility once
-after switching identity. The build fails if the requested identity cannot be
-used; it does not silently fall back to ad-hoc signing. Certificate setup is
-not automated.
+The check launches a separate, short-lived instance through Launch Services,
+calls `AXIsProcessTrusted()`, and exits without registering shortcuts, opening
+menus, prompting for access, or moving windows. Its result is printed and saved
+in `.build/accessibility-check.log`; `make` returns a failure if access is denied.
+It checks the existing bundle without rebuilding it.
+
+**Verified on the M4 Air, 2026-09-28:** after granting access to the
+certificate-signed native debug app, switching to a universal release retained
+Accessibility access without another grant. The two binaries had different
+code hashes and identical designated requirements. Strict signature validation
+passed for the rebuilt app.
 
 ## Automated tests
 

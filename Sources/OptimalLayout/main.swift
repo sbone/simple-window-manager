@@ -156,6 +156,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 let app = NSApplication.shared
+if CommandLine.arguments.contains("--check-accessibility") {
+    let trusted = AXIsProcessTrusted()
+    print(trusted ? "Accessibility: allowed" : "Accessibility: denied")
+    exit(trusted ? EXIT_SUCCESS : EXIT_FAILURE)
+}
 private let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
