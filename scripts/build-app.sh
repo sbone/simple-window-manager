@@ -14,6 +14,9 @@ app="Optimal Layout.app"
 mkdir -p "$app/Contents/MacOS"
 cp "$bin_dir/OptimalLayout" "$app/Contents/MacOS/OptimalLayout"
 cp Resources/Info.plist "$app/Contents/Info.plist"
-codesign --force --sign - "$app"
+codesign --force --sign "${CODE_SIGN_IDENTITY:--}" "$app"
 codesign --verify --strict "$app"
 echo "Built $PWD/$app"
+if [ "${CODE_SIGN_IDENTITY:--}" = "-" ]; then
+    echo "Ad-hoc signing: after code changes, remove and re-add this app in Accessibility settings."
+fi

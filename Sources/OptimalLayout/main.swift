@@ -2,18 +2,13 @@ import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 
-private enum Layout: UInt32, CaseIterable {
-    case one = 1, two, three, four
-
-    var title: String { "Layout \(rawValue)" }
-}
-
+@MainActor
 private final class WindowController {
-    private var cycle: [Layout: Int] = [:]
+    private var geometry = WindowGeometry()
 
     func apply(_ layout: Layout) {
         guard let window = focusedWindow(), let screen = screen(for: window) else { return }
-        let frame = targetFrame(for: layout, screen: screen)
+        let frame = geometry.targetFrame(for: layout, usable: screen.visibleFrame)
         setFrame(frame, on: window)
     }
 
@@ -23,41 +18,8 @@ private final class WindowController {
         guard screens.count > 1, let index = screens.firstIndex(of: current) else { return }
         let next = screens[(index + 1) % screens.count]
         let oldFrame = appKitFrame(of: window)
-        let source = current.visibleFrame
-        let destination = next.visibleFrame
-        let x = (oldFrame.minX - source.minX) / source.width
-        let y = (oldFrame.minY - source.minY) / source.height
-        let frame = CGRect(
-            x: destination.minX + x * destination.width,
-            y: destination.minY + y * destination.height,
-            width: oldFrame.width,
-            height: oldFrame.height
-        )
+        let frame = WindowGeometry.movedFrame(oldFrame, from: current.visibleFrame, to: next.visibleFrame)
         setFrame(frame, on: window)
-    }
-
-    private func targetFrame(for layout: Layout, screen: NSScreen) -> CGRect {
-        let usable = screen.visibleFrame
-        switch layout {
-        case .one:
-            return usable
-        case .two:
-            let right = cycle[.two, default: 0] % 2 == 1
-            cycle[.two] = (cycle[.two, default: 0] + 1) % 2
-            return CGRect(x: right ? usable.midX : usable.minX, y: usable.minY,
-                          width: usable.width / 2, height: usable.height)
-        case .three:
-            return CGRect(x: usable.minX + usable.width / 4, y: usable.minY,
-                          width: usable.width / 2, height: usable.height)
-        case .four:
-            let quadrant = cycle[.four, default: 0] % 4
-            cycle[.four] = (quadrant + 1) % 4
-            let column = quadrant == 1 || quadrant == 2 ? 1 : 0
-            let row = quadrant >= 2 ? 0 : 1
-            return CGRect(x: usable.minX + CGFloat(column) * usable.width / 2,
-                          y: usable.minY + CGFloat(row) * usable.height / 2,
-                          width: usable.width / 2, height: usable.height / 2)
-        }
     }
 
     private func focusedWindow() -> AXUIElement? {
@@ -70,7 +32,9 @@ private final class WindowController {
 
     private func screen(for window: AXUIElement) -> NSScreen? {
         let frame = appKitFrame(of: window)
-        return NSScreen.screens.first { $0.frame.intersects(frame) } ?? NSScreen.main
+        let screens = NSScreen.screens
+        guard let index = WindowGeometry.screenIndex(for: frame, screens: screens.map(\.frame)) else { return NSScreen.main }
+        return screens[index]
     }
 
     private func accessibilityFrame(of window: AXUIElement) -> CGRect {
@@ -87,13 +51,11 @@ private final class WindowController {
 
     private func appKitFrame(of window: AXUIElement) -> CGRect {
         let frame = accessibilityFrame(of: window)
-        let maxY = NSScreen.screens.map(\.frame.maxY).max() ?? frame.maxY
-        return CGRect(x: frame.minX, y: maxY - frame.maxY, width: frame.width, height: frame.height)
+        return WindowGeometry.flippedFrame(frame, screens: NSScreen.screens.map(\.frame))
     }
 
     private func setFrame(_ frame: CGRect, on window: AXUIElement) {
-        let maxY = NSScreen.screens.map(\.frame.maxY).max() ?? frame.maxY
-        var point = CGPoint(x: frame.minX, y: maxY - frame.maxY)
+        var point = WindowGeometry.flippedFrame(frame, screens: NSScreen.screens.map(\.frame)).origin
         var size = frame.size
         guard let position = AXValueCreate(.cgPoint, &point), let dimensions = AXValueCreate(.cgSize, &size) else { return }
         AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, position)
@@ -101,10 +63,12 @@ private final class WindowController {
     }
 }
 
+@MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windows = WindowController()
     private var hotkeys: [EventHotKeyRef?] = []
     private var statusItem: NSStatusItem!
+    private var showingPermissionAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -120,7 +84,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let switchItem = menu.addItem(withTitle: "Switch Display", action: #selector(switchDisplay), keyEquivalent: "")
         switchItem.target = self
         menu.addItem(.separator())
-        let accessibilityItem = menu.addItem(withTitle: "Enable Accessibility…", action: #selector(requestAccessibility), keyEquivalent: "")
+        let accessibilityItem = menu.addItem(withTitle: "Accessibility Settings…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
@@ -134,12 +98,37 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
-    @objc private func apply(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? UInt32, let layout = Layout(rawValue: raw) else { return }
-        windows.apply(layout)
+    @objc private func openAccessibilitySettings() {
+        requestAccessibility()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
-    @objc private func switchDisplay() { windows.switchDisplay() }
+    @objc private func apply(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? UInt32 else { return }
+        performAction(raw)
+    }
+
+    @objc private func switchDisplay() { performAction(0) }
+
+    private func performAction(_ id: UInt32) {
+        guard AXIsProcessTrusted() else {
+            guard !showingPermissionAlert else { return }
+            showingPermissionAlert = true
+            defer { showingPermissionAlert = false }
+            let alert = NSAlert()
+            alert.messageText = "Accessibility permission is needed"
+            alert.informativeText = "Allow Optimal Layout in System Settings → Privacy & Security → Accessibility. If it is already enabled, quit Optimal Layout, remove its entry, add this copy of the app again, and reopen it."
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate()
+            if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
+            return
+        }
+        if let layout = Layout(rawValue: id) { windows.apply(layout) }
+        if id == 0 { windows.switchDisplay() }
+    }
 
     private func installHotkeys() {
         let type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
@@ -148,8 +137,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
             var id = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
-            if let layout = Layout(rawValue: id.id) { delegate.windows.apply(layout) }
-            if id.id == 0 { delegate.windows.switchDisplay() }
+            // Application event-target callbacks run on the main event loop.
+            MainActor.assumeIsolated { delegate.performAction(id.id) }
             return noErr
         }, 1, [type], Unmanaged.passUnretained(self).toOpaque(), nil)
 

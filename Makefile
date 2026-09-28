@@ -1,4 +1,4 @@
-.PHONY: build run release
+.PHONY: build run release test
 
 build:
 	bash scripts/build-app.sh
@@ -8,3 +8,6 @@ run: build
 
 release:
 	bash scripts/build-app.sh release
+
+test:
+	swift test

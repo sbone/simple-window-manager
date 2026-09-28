@@ -200,3 +200,18 @@ The first slice includes:
 **Confirmed by runtime behavior — user-reported, 2026-09-28:** the replacement app successfully adjusts a VS Code window on the M4 MacBook Air. This validates the initial window-control path in a real application. The report does not specify which commands were exercised, so complete cycle order, menu-bar/Dock clearance, other applications, and multi-display behavior remain unverified.
 
 The current Switch Display prototype preserves absolute size and proportional position; this differs from the proportional-size candidate above and does not establish the legacy app's behavior. Preferences, launch at login, shortcut conflict reporting, and distribution signing/notarization remain outstanding.
+
+**Confirmed by automated tests — 2026-09-28:** nine Swift Testing tests now exercise the app's extracted `WindowGeometry` code via `swift test` or `make test`. Coverage includes layout bounds, half/quadrant cycle order and reset, fractional sizes, display-transfer geometry, coordinate conversion, and display selection. No real windows or Accessibility permissions are needed for these tests.
+
+Two regression tests failed against the original geometry and passed after fixes:
+
+- AX/AppKit conversion now uses the primary display's top edge, rather than the maximum top edge across all displays. A display above the primary display previously shifted every converted window frame. Apple's [NSScreen.screens documentation](https://developer.apple.com/documentation/appkit/nsscreen/screens) identifies index zero as the primary display with origin `(0, 0)`.
+- A window spanning displays now selects the display with the greatest intersection area, rather than the first intersecting display. Equal areas keep display order; zero overlap falls back to `NSScreen.main` in the controller.
+
+These are replacement correctness fixes, not new evidence of legacy behavior. GUI shortcut/menu delivery, actual AX resize acceptance, physical multi-display operation, and failure feedback are not covered by the geometry suite. The [README automation plan](README.md#next-automation-layer) describes the remaining opt-in integration checks.
+
+**Confirmed by runtime failure and macOS logs — 2026-09-28:** after rebuilding with `make run`, the user reported that both keyboard shortcuts and menu commands stopped moving windows. `tccd` logged `Failed to match existing code requirement` for `local.OptimalLayout` and `kTCCServiceAccessibility`, showing that the prior universal build's code hashes did not match the new native debug build. This is an invalidated Accessibility grant, not a geometry-test failure. Recovery is to quit OL, remove and re-add the current app in Accessibility settings, then reopen it without rebuilding.
+
+**Confirmed by runtime behavior — user-reported, 2026-09-28:** resetting Accessibility access restored window control after the rebuild failure. This confirms the diagnosed permission issue and recovery procedure.
+
+Both command entry points now share a trust check and show recovery instructions when permission is missing. The build script accepts `CODE_SIGN_IDENTITY` so a stable keychain certificate can be used instead of the default ad-hoc signature. Geometry tests do not validate TCC permission persistence; the new recovery dialog and permission persistence across certificate-signed rebuilds still need runtime verification.

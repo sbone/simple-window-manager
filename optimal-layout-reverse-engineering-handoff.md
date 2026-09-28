@@ -21,6 +21,12 @@ The initial implementation is a dependency-free Swift package in `Package.swift`
 
 **Confirmed by runtime behavior — user-reported:** on 2026-09-28, the replacement successfully adjusted a VS Code window on the M4 MacBook Air. Complete layout cycles, menu commands, other applications, and multi-display behavior still need testing. Next, validate those paths and address window-control errors and shortcut conflicts before expanding the UI.
 
+**Automated validation update — 2026-09-28:** `make test` runs nine passing Swift Testing tests of the production geometry code. They cover cycle order/reset, usable bounds, fractional sizes, display transfer, coordinate conversion, and display selection. Regression tests reproduced and fixes resolved the vertically stacked-display coordinate offset and first-overlap display-selection bugs. Real shortcut/menu delivery and physical multi-display behavior still need GUI integration checks; see the [README automation plan](README.md#next-automation-layer).
+
+**Rebuild/permissions finding — 2026-09-28:** the user's `make run` invalidated the previous Accessibility grant: macOS logs show a code-requirement mismatch for `local.OptimalLayout`. Both shortcut and menu actions consequently stopped working. See [README recovery steps](README.md#commands-stop-working-after-a-rebuild). Commands now share a trust check with recovery feedback, and builds accept `CODE_SIGN_IDENTITY` for a stable signing certificate. The default remains ad-hoc signing.
+
+**Confirmed recovery — user-reported, 2026-09-28:** resetting Accessibility access restored window control. The permission failure and recovery are now verified; persistence across certificate-signed rebuilds remains untested.
+
 ## Goal
 
 Reverse-engineer the behavior and implementation approach of the legacy macOS app **Optimal Layout 2.3.2** so we can build a clean-room replacement for **macOS 14+**, supporting both:
