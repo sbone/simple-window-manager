@@ -8,6 +8,8 @@
     <string>local.OptimalLayout</string>
     <key>CFBundleName</key>
     <string>Optimal Layout</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

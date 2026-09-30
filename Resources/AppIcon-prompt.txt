@@ -1,0 +1,13 @@
+Created with the built-in image_gen tool from app-icon-2026-09-29.png.
+Selected output: second generation, preserving the dimensional silver rim.
+Exported to a 1024px PNG and standard macOS iconset with sips, then ICNS with iconutil.
+
+Initial prompt:
+Use case: precise-object-edit
+Asset type: production macOS application icon, square 1024x1024 RGBA.
+Input image: edit target and exact visual identity reference.
+Primary request: turn the supplied window-manager icon illustration into polished production icon artwork. Preserve its cobalt/electric blue rounded square tile, subtle metallic silver rim, three white windows with silver title bars and red/yellow/green controls, and dark charcoal right-pointing arrow centered in the tall left window. One tall left window, two stacked right windows. Straighten the tile and windows to an upright, front-facing orthographic layout with balanced spacing and crisp geometry. Keep the attractive glossy blue material and restrained dimensional depth, simplify excessive highlights and heavy shadows for small-size clarity. The arrow should be bold and unmistakable.
+Composition: one centered icon occupying about 86% of the square canvas, equal transparent margins, all artwork fully inside canvas. Subtle short shadow only. True transparent background outside the rounded tile; remove the reference's blue backdrop completely. No backdrop, no presentation mockup, no extra objects, no text, no watermark. Deliver a single finished icon.
+
+Refinement prompt:
+Use case: precise-object-edit. Edit this production macOS app icon. Preserve exactly the upright blue rounded tile, silver rim, three windows, traffic-light controls, dark right arrow, proportions, colors, composition, and internal rendering. Change ONLY the outer alpha boundary: remove all isolated blue/cyan/white speckles, bumps, stray pixels and ragged remnants outside the tile, especially above its top edge and along the sides. Make the outer silhouette a perfectly smooth continuous antialiased rounded-square contour. Everything outside that smooth contour must be fully transparent, clean empty alpha with no floating pixels or glow. Retain equal transparent padding. Single square 1024x1024 RGBA production icon. No text or mockup.

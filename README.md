@@ -1,54 +1,40 @@
 # Simple Window Manager
 
-A small, dependency-free AppKit menu-bar app, currently named **Optimal Layout**.
-Targets macOS 14 or later. Swift Package Manager builds the executable; the
-build script packages and locally signs the app.
+A small, dependency-free macOS menu-bar app, currently named **Optimal Layout**.
+Arrange the focused window with keyboard shortcuts or menu commands.
+Requires macOS 14+ and full Xcode with a Swift 6 toolchain to build.
 
-## Requirements
+## Setup
 
-- Full Xcode with a Swift 6 toolchain; verified with Xcode 26.3 / Swift 6.2.4
-  on an Apple Silicon Mac running macOS 15.8.
-- Xcode selected as the active developer directory. Check with
-  `xcode-select -p` and `xcrun swift --version`. If needed, run
-  `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`
-  and open Xcode once to finish its setup.
-- No Homebrew packages or third-party dependencies are needed.
+Select Xcode as the active developer directory and complete its first-launch
+setup. Check with `xcode-select -p` and `xcrun swift --version`; if needed, run
+`sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`.
+No Homebrew packages or third-party dependencies are needed.
 
-## Configure signing once per Mac
-
-Choose an existing code-signing identity from your keychain and save its name
-or hash in the local configuration file:
+Choose an existing code-signing identity once per Mac:
 
 ```sh
 security find-identity -v -p codesigning
-printf '%s\n' '<identity name or hash from the command above>' > .codesign-identity
-```
-
-`.codesign-identity` is git-ignored and stores only the identity reference; the
-private key stays in Keychain. This M4 Air is configured to use the existing
-**Developer ID Application: Quality Time Studio LLC** certificate. Ordinary
-`make build`, `make run`, and `make release` now use that same identity.
-
-`CODE_SIGN_IDENTITY` overrides the file when set. Missing configuration or an
-unusable identity causes the build to fail; there is no silent ad-hoc fallback.
-For a deliberately ad-hoc build, use `CODE_SIGN_IDENTITY=- make build`, knowing
-that code changes can invalidate Accessibility access. Certificate creation is
-not automated.
-
-## Build and run
-
-```sh
+printf '%s\n' '<identity name or hash>' > .codesign-identity
 make run
 ```
 
-This builds for the current Mac and opens `Optimal Layout.app` in the repo
-root. Look for **OL** in the menu bar; there is no Dock icon or main window.
-Quit the running app from that menu before rebuilding it.
+`.codesign-identity` is git-ignored; the private key stays in Keychain.
+`CODE_SIGN_IDENTITY` overrides the file. Missing or unusable signing configuration
+fails the build. For an explicit ad-hoc build, use `CODE_SIGN_IDENTITY=- make build`,
+but Accessibility access may reset after code changes.
 
-On first launch, grant the app access in **System Settings → Privacy &
-Security → Accessibility**. The **Accessibility Settings…** menu item opens
-that pane and requests access again. If the app is missing from the list, use **+** to add
-the generated app. Focus a normal resizable window before trying a shortcut.
+`make run` builds and opens `Optimal Layout.app` in the repo root. Look for **OL**
+in the menu bar; there is no Dock icon or main window. Quit OL before rebuilding.
+Prefer the bundled app over `swift run` so permissions apply to the app you use.
+
+On first launch, grant access in **System Settings → Privacy & Security →
+Accessibility**. The **Accessibility Settings…** menu item opens that pane.
+If OL is missing, use **+** to add the generated app.
+
+## Window controls
+
+Focus a normal resizable window, then use a shortcut or its menu command:
 
 | Shortcut | Action |
 | --- | --- |
@@ -58,243 +44,111 @@ the generated app. Focus a normal resizable window before trying a shortcut.
 | ⌘⌥4 | Cycle upper-left → upper-right → lower-right → lower-left |
 | ⌘⌥0 | Move to the next display |
 
-Cycles are shared across windows and reset when the app restarts. Quit the
-legacy Optimal Layout or other apps using these shortcuts before testing.
+Cycles are shared across windows and reset on restart. Display switching
+preserves window size and relative position. Quit the legacy Optimal Layout
+or other apps using these shortcuts to avoid conflicts.
 
-## Failure feedback
+Failed commands beep and change the label to **OL!**. Open **Window Command
+Failed…** for the reason and recovery advice, also shown in the tooltip.
+Partial moves are reported; failed layouts do not advance the cycle. A successful
+command clears the window error.
 
-When a window command fails, OL beeps and changes its menu-bar label to **OL!**.
-Open **Window Command Failed…** in the menu for the reason and recovery advice;
-the same details appear in the menu-bar tooltip. Feedback covers no active app
-or focused window, invalid window data, unavailable displays, a single-display
-Switch Display attempt, unsupported movement/resizing, and Accessibility API
-failures. If moving succeeds but resizing fails, the message says the window
-was partially changed. A failed layout does not advance its half/quadrant cycle.
-
-Shortcut registration requests exclusive Carbon hotkeys. When macOS reports a
-conflict or registration error, **OL! → Shortcut Problems…** identifies the
-exact shortcut. Other shortcuts continue registering, and menu commands remain
-available. Resolve the conflict and restart OL to retry registration. Exclusive
-registration detects conflicts reported by Carbon; it cannot detect every
-third-party event tap or shortcut interception mechanism.
-
-A successful window command clears the last window error. Shortcut problems
-remain visible until a restart registers them successfully. Window errors do
-not open dialogs or steal focus automatically; details open only when requested.
-The existing Accessibility-permission dialog still offers **Open Settings**.
-
-## Build commands
-
-```sh
-swift build    # Compile the native executable only
-make build     # Package a native debug app without launching it
-make release   # Package an optimized universal arm64 + x86_64 app
-make check-accessibility # Check the packaged app's actual Accessibility grant
-```
-
-Both packaging commands write the same `Optimal Layout.app`, signed with the
-configured identity. Notarization and a distribution pipeline are not configured.
-Prefer the bundled app over `swift run` so permissions apply to the app you
-will actually use.
-
-### Commands stop working after a rebuild
-
-This was reproduced on 2026-09-28: both shortcuts and menu commands stopped
-after `make run`, and macOS logged `Failed to match existing code requirement`
-for `local.OptimalLayout` and `kTCCServiceAccessibility`.
-
-1. Quit OL.
-2. In System Settings → Privacy & Security → Accessibility, remove the old
-   **Optimal Layout** entry, even if it appears enabled.
-3. Use **+** to add `Optimal Layout.app` from this repo and enable it.
-4. Reopen that app without rebuilding: `open "Optimal Layout.app"`.
-
-The user confirmed on 2026-09-28 that resetting Accessibility access restored
-window control after this rebuild failure.
-
-Window commands now check Accessibility trust and explain how to recover if
-permission is missing. The OS permission grant still requires user action.
-
-### Verify permission survives a rebuild
-
-Switching from the old ad-hoc build to certificate signing requires one final
-Accessibility grant using the recovery steps above. Thereafter, keep using the
-same certificate and bundle identifier. macOS uses the app's designated
-requirement to recognize updated builds; see Apple's
-[code-signing requirements explanation](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
-
-```sh
-make check-accessibility   # Must report Accessibility: allowed
-# Quit OL from the menu before replacing the app.
-make release               # Changes native debug into universal release
-make check-accessibility   # Should still report Accessibility: allowed
-open "Optimal Layout.app"
-```
-
-The check launches a separate, short-lived instance through Launch Services,
-calls `AXIsProcessTrusted()`, and exits without registering shortcuts, opening
-menus, prompting for access, or moving windows. Its result is printed and saved
-in `.build/accessibility-check.log`; `make` returns a failure if access is denied.
-It checks the existing bundle without rebuilding it.
-
-**Verified on the M4 Air, 2026-09-28:** after granting access to the
-certificate-signed native debug app, switching to a universal release retained
-Accessibility access without another grant. The two binaries had different
-code hashes and identical designated requirements. Strict signature validation
-passed for the rebuilt app.
-
-## Automated tests
-
-```sh
-make test      # Or: swift test
-```
-
-Twenty-four tests use Swift Testing (included with the toolchain), with no added
-dependencies or Accessibility permission. Nine exercise the same geometry code
-used by the app; fifteen cover failures using injected Accessibility/Carbon
-results. They do not launch the app, move real windows, or register real shortcuts:
-
-- Full and centered layouts within usable bounds, including offset displays.
-- Half and quadrant cycle order, wrapping, independent state, and session reset.
-- Fractional window sizes staying inside usable bounds.
-- Transfer between different display sizes, preserving absolute size and relative origin.
-- AX/AppKit coordinate conversion with a display above the primary display.
-- Selecting the display containing the largest portion of a spanning window,
-  including ties, off-screen windows, and empty display lists.
-
-These tests reproduced and now guard against two bugs: a vertically stacked
-display shifting the coordinate origin, and a spanning window selecting the
-first intersecting display instead of the largest overlap.
-
-Failure coverage includes absent or malformed focused windows, denied or failed
-Accessibility queries, invalid frames, non-settable sizes checked before moving,
-failed position writes stopping resize, partial move/resize failures, correct AX
-value writes, cycle preservation on failure, exclusive shortcut registration,
-continuing after one shortcut conflicts, unexpected registration failures, and
-retaining shortcut warnings after successful window commands.
-
-**Runtime validation — 2026-09-28:** a separate temporary probe attempted all
-five exclusive shortcuts while the signed app was running. Carbon returned
-`eventHotKeyExistsErr` (`-9878`) for each, and the production registration code
-reported the correct combination. The probe sent no keystrokes or window
-commands. The signed universal build passed verification and retained
-Accessibility access. The GUI harness below now also checks warning presentation.
-
-### GUI smoke test
-
-```sh
-make smoke-test
-```
-
-This opt-in test requires a logged-in macOS desktop, Swift 6.2+, and the stable
-signing configuration above. It builds the main app and a separate signed helper
-at `.build/OL Smoke Test.app`. On first run, grant **OL Smoke Test** Accessibility
-access in System Settings, then rerun the command. OL also needs its existing
-grant. Missing permission reports `BLOCKED` and a nonzero command exit; the test
-does not grant permissions automatically.
-
-The helper creates its own disposable window and temporarily takes focus.
-**Leave the keyboard and mouse idle while it runs.** Click **Stop Test** or close
-the test window to cancel. The helper checks focus before sending shortcuts or
-selecting menu commands. Existing user document windows are not test fixtures.
-
-The run covers:
-
-- Full, centered, left/right, and clockwise quadrant placements through both
-  real keyboard events and Accessibility-driven menu clicks, including wraparound.
-- A non-resizable window: no partial movement, the `OL!` indicator, the failure
-  menu entry, dialog text/dismissal, retry staying at the first half, and warning clearance.
-- A deliberately reserved ⌘⌥2 shortcut: the conflict indicator and exact dialog
-  text, other shortcuts still working, the corresponding menu action still working,
-  warnings surviving successful commands, and a clean restart after releasing the shortcut.
-- With multiple connected displays, next-display movement through shortcuts and
-  menu actions with wraparound, preserving size and relative position. A one-display
-  setup prints an explicit `SKIP` for this portion.
-
-Expected rectangles are calculated from the product specification independently
-of production geometry. The helper observes its real `NSWindow.frame`, allows
-2 points of rounding tolerance, and requires three matching samples. It polls
-conditions with four-second deadlines instead of assuming success after a fixed
-delay. Cross-process Accessibility work runs off the main actor so the helper
-can continue serving OL's window queries and writes.
-
-Results are saved to `.build/smoke-test.log`; failures include expected/actual
-frames or an explanation plus a bounded Accessibility snapshot of OL. Helper
-stderr goes to `.build/smoke-test-stderr.log`. The command returns nonzero for
-failure, cancellation, or missing permission. It releases the helper's temporary
-shortcut, closes its windows, and restarts one normal OL instance after the run.
-A lock prevents overlapping runs; after a force-kill, remove a stale
-`.build/smoke-test.lock` directory only after confirming no helper is running.
-
-**Verified on 2026-09-28:** 27 GUI checks passed on the M4 Air; multi-display
-placement was explicitly skipped because macOS exposed one display. The helper's
-first run also correctly reported missing permission and restored OL. These
-checks cover the controlled AppKit test window, not every application's sizing
-constraints or every display arrangement.
-
-**Two-display verification — 2026-09-28:** after connecting a second monitor via
-HDMI through a USB hub, all 29 GUI checks passed with zero skips. ⌘⌥0 moved the
-400 × 250-point fixture to display index 1; the Switch Display menu command
-wrapped back to index 0. Both preserved size and relative position within the
-2-point tolerance. This verifies the connected arrangement; other arrangements
-and third-party window constraints remain to validate.
+**Shortcut Problems…** identifies registration failures. Other shortcuts and
+menu commands remain available. Resolve the conflict and restart OL to retry.
+Conflict detection covers errors reported by Carbon, not every third-party
+shortcut interception mechanism.
 
 ## Launch at Login
 
-Choose **OL → Launch at Login** to enable or disable automatic startup for your
-macOS account. A checkmark means enabled; a dash means macOS requires approval.
-Use **Approve Launch at Login…** to open System Settings in that case. Clicking
-the pending toggle cancels the registration. Errors appear in a dialog.
+Choose **OL → Launch at Login** to toggle startup for your account. A checkmark
+means enabled; a dash means approval is required. Use **Approve Launch at Login…**
+to open System Settings, or click the pending toggle to cancel registration.
+Keep the app at a stable path; rebuilding in place preserves it.
 
-OL uses Apple's [SMAppService.mainApp](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp).
-The menu reads the current system status whenever it opens, including changes
-made in System Settings → General → Login Items. There is no separate saved
-preference and OL does not register itself automatically on ordinary launch.
-Keep the registered app at a stable location; this development setup uses the
-repo's `Optimal Layout.app`. Rebuilding in place keeps that path.
+## Build and test
 
-The optional integration test changes the real login setting, checks it after
-restarting OL, and restores the original setting:
+| Command | Purpose |
+| --- | --- |
+| `make run` | Build and open the app |
+| `make build` | Package and sign a native debug app |
+| `make release` | Package and sign a universal arm64 + x86_64 release |
+| `swift build` | Compile the executable only |
+| `make check-accessibility` | Check the existing bundle's Accessibility grant |
+| `make test` | Run unit tests without Accessibility permission |
+| `make smoke-test` | Run GUI checks on a logged-in desktop |
+
+Debug and release builds write the same `Optimal Layout.app`. Notarization and
+a distribution pipeline are not configured.
+
+The 24 unit tests cover window geometry, display selection, layout cycles,
+Accessibility failures, and shortcut registration. They do not move real windows
+or register real shortcuts.
+
+The GUI suite builds `.build/OL Smoke Test.app`, which needs its own Accessibility
+grant alongside OL's. Grant it on first run, then rerun. **Leave the keyboard and
+mouse idle during the test.** It uses disposable windows; click **Stop Test** or
+close the test window to cancel. Checks cover layouts, shortcuts, menu commands,
+error feedback, and display switching (skipped with one display).
+
+To include login-item registration and persistence checks:
 
 ```sh
 bash scripts/smoke-test.sh --login-item
 ```
 
-This runs the normal GUI suite plus the login-item checks. Resolve pending macOS
-approval before running it. It tests registration and persistence across app
-restarts; actual launch after logging out or restarting the Mac is a separate
-manual check. A force-killed test may require restoring the setting in OL's menu.
+This changes the real login setting and restores it afterward; a force-killed
+run may require manual restoration. Resolve pending macOS approval first.
+Actual startup after login remains a manual check.
 
-**Verified on 2026-09-28:** all 31 GUI checks passed on two displays, including
-login-item toggling and restoration across app restarts. All 24 unit tests and
-the universal release build also pass. Approval-required and registration-error
-dialog paths have not been exercised on this Mac.
+Logs are in `.build/smoke-test.log` and `.build/smoke-test-stderr.log`.
+Failures, cancellation, or missing permissions return a nonzero status. The
+harness cleans up and restarts OL afterward. After a force-kill, remove a stale
+`.build/smoke-test.lock` only after confirming no helper is running.
 
-## Manual smoke test
+**Last verified, 2026-09-28:** 24 unit tests and 31 GUI checks passed on an M4
+MacBook Air with two displays, including login-item restoration. Universal builds
+and Accessibility retention across certificate-signed rebuilds also passed.
+Toolchain: Xcode 26.3 / Swift 6.2.4 on macOS 15.8.
 
-1. Launch the app and verify **OL** appears in the menu bar.
-2. Grant Accessibility access, then focus a resizable TextEdit or Terminal window.
-3. Try all four layout shortcuts, including repeated presses of 2 and 4.
-   Check that placements avoid the menu bar and Dock; try a menu command too.
-4. With two displays, try ⌘⌥0 in both directions. Current implementation
-   preserves absolute window size and proportional position within usable bounds.
-5. Quit from the menu and confirm the process exits.
+## Accessibility after rebuilding
 
-On 2026-09-28, the user confirmed successful VS Code window adjustment on the
-M4 MacBook Air. Cycle calculations now have automated coverage; shortcut and menu delivery plus warning presentation now pass the automated GUI
-harness. A two-display transfer and wraparound also pass; other display arrangements
-and applications' edge cases remain.
+Keep the same signing identity and bundle identifier to preserve access. Switching
+from ad-hoc to certificate signing may require a fresh grant. If commands stop
+working after a rebuild:
 
-Window behavior is still a prototype: additional display arrangements and
-third-party/full-screen window constraints still need validation. The app checks API results but does not yet read the resulting frame
-back: an app can report success while constraining the requested size. A Preferences
-window is not implemented yet; Launch at Login is available directly in the menu.
+1. Quit OL.
+2. Remove **Optimal Layout** from System Settings → Privacy & Security → Accessibility.
+3. Use **+** to add the rebuilt `Optimal Layout.app` and enable it.
+4. Reopen it without rebuilding: `open "Optimal Layout.app"`.
+
+Use `make check-accessibility` before and after a rebuild to verify access.
+It checks the existing bundle without prompting or moving windows, writes
+`.build/accessibility-check.log`, and fails if access is denied.
+
+## Current scope
+
+Four built-in layouts and focused-window commands. Preferences, custom layouts,
+and per-application rules are not implemented. Third-party/full-screen window
+constraints and additional display arrangements still need validation. The app
+checks API results but does not read frames back, so an app can report success
+while constraining the requested size. Login-item approval and registration-error
+dialog paths also remain unverified.
+
+## App icon
+
+<img src="Resources/AppIcon.png" alt="Optimal Layout app icon: three windows on a blue tile with a right-pointing arrow" width="128" height="128">
+
+The icon is an homage to the original Optimal Layout app's icon, carrying forward
+its window-and-arrow motif in a blue, dimensional design.
+
+The [1024px master](Resources/AppIcon.png) and [macOS iconset](Resources/AppIcon.iconset/)
+produce the bundled `Resources/AppIcon.icns`. To repack the existing sizes:
+
+```sh
+iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
+```
 
 ## Design and investigation
 
 - [Reverse-engineering findings](optimal-layout-reverse-engineering.md)
 - [Original investigation and handoff](optimal-layout-reverse-engineering-handoff.md)
-
-The findings distinguish legacy behavior from replacement requirements.
-The initial product keeps four built-in layouts and focused-window commands;
-custom layouts and per-application rules are out of scope.

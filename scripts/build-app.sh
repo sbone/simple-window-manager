@@ -21,9 +21,10 @@ fi
 swift build --product OptimalLayout "${build_args[@]}"
 bin_dir=$(swift build "${build_args[@]}" --show-bin-path)
 app="Optimal Layout.app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin_dir/OptimalLayout" "$app/Contents/MacOS/OptimalLayout"
 cp Resources/Info.plist "$app/Contents/Info.plist"
+cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 codesign --force --sign "$signing_identity" "$app"
 codesign --verify --strict "$app"
 echo "Built $PWD/$app"
