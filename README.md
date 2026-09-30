@@ -1,6 +1,6 @@
-# Simple Window Manager
+# Optimal Layout redux
 
-A small macOS menu-bar app, currently named **Optimal Layout**.
+A lightweight modern-macOS-compliant take on [Optimal Layout 🪦2015🥀](https://optimal-layout.macupdate.com/), an app for controlling window sizes and position on screen.
 Arrange the focused window with keyboard shortcuts or menu commands.
 Requires macOS 14+ on Apple Silicon or Intel.
 
