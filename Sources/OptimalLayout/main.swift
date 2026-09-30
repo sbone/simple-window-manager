@@ -3,6 +3,7 @@ import ApplicationServices
 import Carbon.HIToolbox
 import ServiceManagement
 import Sparkle
+import SwiftUI
 
 @MainActor
 private final class WindowController {
@@ -49,7 +50,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var eventHandler: EventHandlerRef?
     private var statusItem: NSStatusItem!
     private var showingPermissionAlert = false
-    private var problems = AppProblems()
+    private var settingsWindow: NSWindow?
+    private lazy var settings = SettingsModel(updaterController: updaterController)
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
     )
@@ -77,6 +79,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         switchItem.keyEquivalentModifierMask = [.command, .option]
         switchItem.target = self
         menu.addItem(.separator())
+        let settingsItem = menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self
         let accessibilityItem = menu.addItem(withTitle: "Accessibility Settings…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
         loginItem.target = self
@@ -92,17 +96,36 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Optimal Layout", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
+        let appMenu = NSMenu(title: "Optimal Layout")
+        let settingsCommand = appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settingsCommand.target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit Optimal Layout", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let mainMenu = NSMenu()
+        for submenu in [appMenu, editMenu, windowMenu] {
+            let item = NSMenuItem()
+            item.submenu = submenu
+            mainMenu.addItem(item)
+        }
+        NSApp.mainMenu = mainMenu
         installHotkeys()
         requestAccessibility()
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        settings.refresh()
         updateLoginItem()
         automaticUpdatesItem.state = updaterController.updater.automaticallyChecksForUpdates ? .on : .off
     }
 
     @objc private func toggleAutomaticUpdates() {
-        updaterController.updater.automaticallyChecksForUpdates.toggle()
+        settings.refresh()
+        settings.automaticallyChecksForUpdates.toggle()
     }
 
     private func updateLoginItem() {
@@ -114,24 +137,37 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     @objc private func openLoginSettings() { SMAppService.openSystemSettingsLoginItems() }
 
     @objc private func toggleLaunchAtLogin() {
-        do {
-            switch SMAppService.mainApp.status {
-            case .enabled, .requiresApproval:
-                try SMAppService.mainApp.unregister()
-            default:
-                try SMAppService.mainApp.register()
-                if SMAppService.mainApp.status == .requiresApproval { openLoginSettings() }
-            }
-        } catch {
-            let previousApp = NSWorkspace.shared.frontmostApplication
-            let alert = NSAlert()
-            alert.messageText = "Launch at Login could not be changed"
-            alert.informativeText = error.localizedDescription
-            NSApp.activate()
-            alert.runModal()
-            previousApp?.activate(options: [])
-        }
+        settings.refresh()
+        settings.launchAtLogin.toggle()
         updateLoginItem()
+        if settings.loginError != nil { showSettings() }
+        else if settings.loginStatus == .requiresApproval { openLoginSettings() }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        settings.refresh()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return true
+    }
+
+    @objc private func showSettings() {
+        settings.refresh()
+        if settingsWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 740),
+                                  styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                                  backing: .buffered, defer: false)
+            window.title = "Optimal Layout Settings"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView: SettingsView(settings: settings))
+            window.center()
+            window.setFrameAutosaveName("Settings")
+            settingsWindow = window
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
     }
 
     @objc private func requestAccessibility() {
@@ -140,12 +176,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
-    @objc private func openAccessibilitySettings() {
-        requestAccessibility()
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
-    }
+    @objc private func openAccessibilitySettings() { settings.openAccessibilitySettings() }
 
     @objc private func apply(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? UInt32 else { return }
@@ -171,9 +202,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         do {
             if let layout = Layout(rawValue: id) { try windows.apply(layout) }
             if id == 0 { try windows.switchDisplay() }
-            problems.windowFailure = nil
+            settings.problems.windowFailure = nil
         } catch {
-            problems.windowFailure = error.localizedDescription
+            settings.problems.windowFailure = error.localizedDescription
             NSLog("Window command %u failed: %@", id, String(describing: error))
             NSSound.beep()
         }
@@ -181,7 +212,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func updateProblems() {
-        let messages = problems.messages
+        let messages = settings.problems.messages
         let label = messages.isEmpty ? "Optimal Layout" : "Optimal Layout needs attention"
         let symbol = messages.isEmpty ? "rectangle.split.2x2" : "exclamationmark.triangle"
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
@@ -191,14 +222,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         statusItem.button?.setAccessibilityLabel(label)
         statusItem.button?.toolTip = messages.isEmpty ? "Optimal Layout" : messages.joined(separator: "\n\n")
         problemItem.isHidden = messages.isEmpty
-        problemItem.title = problems.windowFailure == nil ? "Shortcut Problems…" : "Window Command Failed…"
+        problemItem.title = settings.problems.windowFailure == nil ? "Shortcut Problems…" : "Window Command Failed…"
     }
 
     @objc private func showProblems() {
         let previousApp = NSWorkspace.shared.frontmostApplication
         let alert = NSAlert()
         alert.messageText = "Optimal Layout needs attention"
-        alert.informativeText = problems.messages.joined(separator: "\n\n")
+        alert.informativeText = settings.problems.messages.joined(separator: "\n\n")
         NSApp.activate()
         alert.runModal()
         previousApp?.activate(options: [])
@@ -217,13 +248,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             return noErr
         }, 1, [type], Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
         guard handlerResult == noErr else {
-            problems.shortcutFailures = ["Global shortcuts could not start (macOS error \(handlerResult)). Restart OL. Menu commands are still available."]
+            settings.problems.shortcutFailures = ["Global shortcuts could not start (macOS error \(handlerResult)). Restart OL. Menu commands are still available."]
             updateProblems()
             return
         }
         let registration = Shortcut.registerAll()
         hotkeys = registration.references
-        problems.shortcutFailures = registration.failures
+        settings.problems.shortcutFailures = registration.failures
         for failure in registration.failures { NSLog("Shortcut registration failed: %@", failure) }
         updateProblems()
     }

@@ -12,6 +12,12 @@ DMG, then open the app from Applications and grant Accessibility access when
 prompted. Look for the **window-grid icon** in the menu bar; there is no Dock icon or main window.
 No Xcode or command-line tools are needed to use a release.
 
+Open **Settings…** from the menu to see Accessibility permission, launch-at-login
+status, update preferences, shortcut conflicts, and the last window-command error.
+Status refreshes when you return from System Settings; **Refresh Status** checks
+again. **Copy Diagnostics** collects version, app location, statuses, and errors
+for a bug report. Screen Recording and Input Monitoring are not required.
+
 Quit other copies of Optimal Layout before testing. Keep a backup if replacing
 the original app. Development builds using the old `local.OptimalLayout`
 identifier need a fresh Accessibility grant for this release. Disable Launch at
@@ -198,8 +204,8 @@ It checks the existing bundle without prompting or moving windows, writes
 
 ## Current scope
 
-Four built-in layouts and focused-window commands. Preferences, custom layouts,
-and per-application rules are not implemented. Third-party/full-screen window
+Four built-in layouts, focused-window commands, and a native Settings window.
+Custom layouts and per-application rules are not implemented. Third-party/full-screen window
 constraints and additional display arrangements still need validation. The app
 checks API results but does not read frames back, so an app can report success
 while constraining the requested size. Login-item approval and registration-error
