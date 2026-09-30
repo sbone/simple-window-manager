@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Resources/AppIcon.png" width="160" alt="Optimal Layout app icon: three windows on a blue tile with a right-pointing arrow">
+</p>
+
 # Optimal Layout redux
 
 A lightweight modern-macOS-compliant take on [Optimal Layout 🪦2015🥀](https://optimal-layout.macupdate.com/), an app for controlling window sizes and position on screen.
@@ -212,8 +216,6 @@ while constraining the requested size. Login-item approval and registration-erro
 dialog paths also remain unverified.
 
 ## App icon
-
-<img src="Resources/AppIcon.png" alt="Optimal Layout app icon: three windows on a blue tile with a right-pointing arrow" width="128" height="128">
 
 The icon is an homage to the original Optimal Layout app's icon, carrying forward
 its window-and-arrow motif in a blue, dimensional design.
