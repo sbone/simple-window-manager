@@ -3,7 +3,14 @@ import Foundation
 enum Layout: UInt32, CaseIterable {
     case one = 1, two, three, four
 
-    var title: String { "Layout \(rawValue)" }
+    var title: String {
+        switch self {
+        case .one: "Fill Screen"
+        case .two: "Cycle Left / Right Half"
+        case .three: "Center Half Width"
+        case .four: "Cycle Corners"
+        }
+    }
 }
 
 struct WindowGeometry {

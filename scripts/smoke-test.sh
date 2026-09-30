@@ -13,14 +13,14 @@ restore() {
         if ! pgrep -x OLSmokeTest >/dev/null; then break; fi
         sleep 0.1
     done
-    osascript -e 'tell application id "local.OptimalLayout" to quit' >/dev/null 2>&1 || true
+    osascript -e 'tell application id "com.stevenbone.optimallayout" to quit' >/dev/null 2>&1 || true
     open "$PWD/Optimal Layout.app" || true
     rmdir .build/smoke-test.lock
 }
 trap restore EXIT
 trap 'exit 130' INT TERM
 if [ -d "Optimal Layout.app" ]; then
-    osascript -e 'tell application id "local.OptimalLayout" to quit'
+    osascript -e 'tell application id "com.stevenbone.optimallayout" to quit'
 fi
 bash scripts/build-app.sh
 swift build --product OLSmokeTest

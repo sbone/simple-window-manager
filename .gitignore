@@ -2,3 +2,5 @@
 .DS_Store
 Optimal Layout.app/
 .codesign-identity
+.notary-profile
+dist/

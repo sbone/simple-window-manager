@@ -1,0 +1,45 @@
+Optimal Layout — 0.2.0 (3)
+
+Requires macOS 14 or later. Supports Apple Silicon and Intel Macs.
+
+1. Quit any running copy of Optimal Layout, including the original app.
+2. Drag Optimal Layout into Applications. If an older app with this name is
+   already there, keep a backup before replacing it.
+3. Eject this disk image and open Optimal Layout from Applications.
+4. Allow Accessibility access in System Settings > Privacy & Security >
+   Accessibility. If needed, use + to add the copy in Applications.
+
+Look for the window-grid icon in the menu bar. There is no Dock icon or main window.
+The first macOS prompt confirming that you want to open a downloaded app is normal.
+
+Focus a resizable window, then hold Command + Option and press:
+  1: Fill the usable display
+  2: Alternate left and right halves
+  3: Center at half width and full height
+  4: Cycle clockwise through the four corners
+  0: Move to the next display
+
+Menu commands show these shortcuts. A warning triangle means there is a problem;
+open its menu for details.
+Other window managers may use the same shortcuts. Quit them while testing.
+Enable Launch at Login from the OL menu only after installing in Applications.
+
+For updates, choose Check for Updates from the menu, or enable Automatically
+Check for Updates. Sparkle verifies the update signature before installing it.
+Versions before 0.2.0 need one manual update: quit OL, replace the app in Applications,
+then reopen it.
+If you used a development build with the old local.OptimalLayout identifier,
+grant Accessibility to this release as a new app. Disable Launch at Login in
+the old development copy before switching, then enable it in the installed copy.
+
+To uninstall: disable Launch at Login, quit OL, and move the app to Trash.
+
+When reporting a problem, include this version, your macOS version, Mac model,
+the affected app, the command, and your display arrangement. Include the warning
+message or a screenshot when available. Tell us what you expected and what happened.
+
+Known limitations: some apps enforce minimum window sizes; moving a large window
+to a smaller display can leave it partly off-screen (use Command + Option + 1 to
+fit it). Full-screen windows and additional display arrangements need testing.
+
+This is an independent replacement inspired by the original Optimal Layout.

@@ -24,7 +24,7 @@ struct Shortcut: Sendable {
     ]
     let id: UInt32
     let keyCode: UInt32
-    var label: String { "⌘⌥\(id) (\(Layout(rawValue: id)?.title ?? "Switch Display"))" }
+    var label: String { "⌘⌥\(id) (\(Layout(rawValue: id)?.title ?? "Move to Next Display"))" }
 
     @MainActor
     static func registerAll(using register: (Shortcut) throws -> EventHotKeyRef = { try $0.register() }) -> (references: [EventHotKeyRef], failures: [String]) {

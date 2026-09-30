@@ -187,7 +187,7 @@ struct FailureTests {
         }
         #expect(registered == [1, 3, 4, 0])
         #expect(result.references.count == 4)
-        #expect(result.failures == [ShortcutFailure(shortcut: "⌘⌥2 (Layout 2)", status: OSStatus(eventHotKeyExistsErr)).localizedDescription])
+        #expect(result.failures == [ShortcutFailure(shortcut: "⌘⌥2 (Cycle Left / Right Half)", status: OSStatus(eventHotKeyExistsErr)).localizedDescription])
         #expect(result.failures.first?.contains("already registered") == true)
     }
 

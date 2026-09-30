@@ -130,7 +130,7 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func stopOL() async throws {
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "local.OptimalLayout")
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.stevenbone.optimallayout")
             .filter { $0.bundleURL?.standardizedFileURL == appURL.standardizedFileURL }
         for app in apps { app.terminate() }
         try await wait("OL to quit", checkCancellation: false) { apps.allSatisfy(\.isTerminated) }
@@ -141,6 +141,7 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         try await stopOL()
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = false
+        configuration.arguments = ["-SUEnableAutomaticChecks", "NO"]
         ol = try await NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
         try await wait("OL menu-bar item") { await UI.status(pid: self.ol!.processIdentifier) != nil }
     }
@@ -200,9 +201,10 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
             (4, kVK_ANSI_4, [0, 0.5, 0.5, 0.5]), (4, kVK_ANSI_4, [0.5, 0.5, 0.5, 0.5]),
             (4, kVK_ANSI_4, [0.5, 0, 0.5, 0.5]), (4, kVK_ANSI_4, [0, 0, 0.5, 0.5]), (4, kVK_ANSI_4, [0, 0.5, 0.5, 0.5])
         ]
+        let titles = [1: "Fill Screen", 2: "Cycle Left / Right Half", 3: "Center Half Width", 4: "Cycle Corners"]
         for (index, test) in cases.enumerated() {
             try await seed()
-            if usingMenu { try await UI.menu(pid: ol!.processIdentifier, title: "Layout \(test.0)") }
+            if usingMenu { try await UI.menu(pid: ol!.processIdentifier, title: titles[test.0]!) }
             else { try key(test.1) }
             let f = test.2
             let expected = CGRect(x: usable.minX + usable.width * f[0], y: usable.minY + usable.height * f[1],
@@ -212,9 +214,9 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func expectStatus(warning: Bool) async throws {
-        try await wait(warning ? "OL! warning" : "warning to clear") {
+        try await wait(warning ? "warning icon" : "warning to clear") {
             guard let text = await UI.status(pid: self.ol!.processIdentifier) else { return false }
-            return text.contains("OL!") == warning
+            return text.contains("Optimal Layout needs attention") == warning
         }
     }
 
@@ -259,13 +261,13 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         try await restartOL()
         try await expectStatus(warning: true)
         try await seed()
-        try await showWarning(menuTitle: "Shortcut Problems…", containing: "⌘⌥2 (Layout 2) is already registered")
+        try await showWarning(menuTitle: "Shortcut Problems…", containing: "⌘⌥2 (Cycle Left / Right Half) is already registered")
         try await seed()
         try key(kVK_ANSI_1)
         try await expectFrame(screen.visibleFrame, named: "Other shortcut works during conflict")
         try await expectStatus(warning: true)
         try await seed()
-        try await UI.menu(pid: ol!.processIdentifier, title: "Layout 2")
+        try await UI.menu(pid: ol!.processIdentifier, title: "Cycle Left / Right Half")
         let usable = screen.visibleFrame
         try await expectFrame(CGRect(x: usable.minX, y: usable.minY, width: usable.width / 2, height: usable.height), named: "Conflicting shortcut's menu command still works")
         try await expectStatus(warning: true)
@@ -289,7 +291,7 @@ final class SmokeRunner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.setFrame(CGRect(x: first.minX + first.width * 0.2, y: first.minY + first.height * 0.2, width: width, height: height), display: true)
         for index in 1...screens.count {
             try await focus()
-            if index.isMultiple(of: 2) { try await UI.menu(pid: ol!.processIdentifier, title: "Switch Display") }
+            if index.isMultiple(of: 2) { try await UI.menu(pid: ol!.processIdentifier, title: "Move to Next Display") }
             else { try key(kVK_ANSI_0) }
             let destination = screens[index % screens.count].visibleFrame
             try await expectFrame(CGRect(x: destination.minX + destination.width * 0.2, y: destination.minY + destination.height * 0.2,

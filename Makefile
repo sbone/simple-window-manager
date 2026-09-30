@@ -1,4 +1,4 @@
-.PHONY: build run release test check-accessibility smoke-test
+.PHONY: build run release dist publish test check-accessibility smoke-test
 
 build:
 	bash scripts/build-app.sh
@@ -8,6 +8,12 @@ run: build
 
 release:
 	bash scripts/build-app.sh release
+
+dist:
+	bash scripts/release-macos.sh
+
+publish:
+	bash scripts/publish-release.sh
 
 test:
 	swift test

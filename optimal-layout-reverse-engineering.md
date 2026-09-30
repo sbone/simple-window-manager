@@ -1,5 +1,8 @@
 # Optimal Layout 2.3.2 Reverse Engineering
 
+> Historical investigation and development log. For current installation,
+> signing, release packaging, and test instructions, see [README.md](README.md).
+
 This is the working findings report for the clean-room replacement. Conclusions are labeled by evidence level.
 
 ## Executive Summary
@@ -208,7 +211,7 @@ Two regression tests failed against the original geometry and passed after fixes
 - AX/AppKit conversion now uses the primary display's top edge, rather than the maximum top edge across all displays. A display above the primary display previously shifted every converted window frame. Apple's [NSScreen.screens documentation](https://developer.apple.com/documentation/appkit/nsscreen/screens) identifies index zero as the primary display with origin `(0, 0)`.
 - A window spanning displays now selects the display with the greatest intersection area, rather than the first intersecting display. Equal areas keep display order; zero overlap falls back to `NSScreen.main` in the controller.
 
-These are replacement correctness fixes, not new evidence of legacy behavior. GUI shortcut/menu delivery, actual AX resize acceptance, physical multi-display operation, and failure feedback are not covered by the geometry suite. The [README automation plan](README.md#gui-smoke-test) describes the remaining opt-in integration checks.
+These are replacement correctness fixes, not new evidence of legacy behavior. GUI shortcut/menu delivery, actual AX resize acceptance, physical multi-display operation, and failure feedback are not covered by the geometry suite. The [README automation plan](README.md#build-and-test) describes the remaining opt-in integration checks.
 
 **Confirmed by runtime failure and macOS logs — 2026-09-28:** after rebuilding with `make run`, the user reported that both keyboard shortcuts and menu commands stopped moving windows. `tccd` logged `Failed to match existing code requirement` for `local.OptimalLayout` and `kTCCServiceAccessibility`, showing that the prior universal build's code hashes did not match the new native debug build. This is an invalidated Accessibility grant, not a geometry-test failure. Recovery is to quit OL, remove and re-add the current app in Accessibility settings, then reopen it without rebuilding.
 
@@ -232,7 +235,7 @@ Global shortcuts now request exclusive Carbon registration and retain individual
 
 **Confirmed by GUI integration tests — 2026-09-28:** two complete `make smoke-test` runs passed 27 checks on the M4 Air, including the final focus guard. A separately signed AppKit helper sends real shortcuts, clicks OL menus through Accessibility, and compares its actual window frame with independent expectations. Full, centered, half, and quadrant placements and wraparound pass through both command paths. A non-resizable fixture verifies no partial movement, the warning indicator and dialog, cycle-preserving retry, and warning clearance. Reserving ⌘⌥2 in the helper verifies the exact conflict dialog, another shortcut still working, menu fallback, and persistent shortcut warnings after successful commands.
 
-The helper required a separate user-granted Accessibility permission; its first blocked run reported that requirement and restored OL. Subsequent signed rebuilds retained access. Successful runs closed the fixture, released the temporary shortcut, and restored normal OL. The 24 unit tests also still pass. The harness skips physical multi-display checks explicitly when only one display is exposed, as on these runs. These results establish replacement behavior for the controlled fixture, not legacy behavior or universal compatibility with third-party/full-screen windows. Production frame read-back remains future work. See [README GUI smoke test](README.md#gui-smoke-test) for rerun instructions and logs.
+The helper required a separate user-granted Accessibility permission; its first blocked run reported that requirement and restored OL. Subsequent signed rebuilds retained access. Successful runs closed the fixture, released the temporary shortcut, and restored normal OL. The 24 unit tests also still pass. The harness skips physical multi-display checks explicitly when only one display is exposed, as on these runs. These results establish replacement behavior for the controlled fixture, not legacy behavior or universal compatibility with third-party/full-screen windows. Production frame read-back remains future work. See [README GUI smoke test](README.md#build-and-test) for rerun instructions and logs.
 
 **Confirmed by physical two-display GUI test — 2026-09-28:** with a second monitor connected via HDMI through a USB hub, `make smoke-test` detected two displays and passed 29 checks with zero skips. The actual ⌘⌥0 shortcut moved the owned fixture to display index 1 at `(2902, 546, 400, 250)`; the Switch Display menu command wrapped to index 0 at `(512, 282, 400, 250)`. Both actual frames matched independently calculated expectations within 2 points, preserving absolute size and proportional position. All existing placement and warning checks also passed. This validates the current connected arrangement, not every display topology or third-party application's constraints.
 

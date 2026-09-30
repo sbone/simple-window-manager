@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 import ServiceManagement
+import Sparkle
 
 @MainActor
 private final class WindowController {
@@ -49,26 +50,31 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var statusItem: NSStatusItem!
     private var showingPermissionAlert = false
     private var problems = AppProblems()
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+    )
     private let problemItem = NSMenuItem(title: "Show Problems…", action: #selector(showProblems), keyEquivalent: "")
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
     private let loginSettingsItem = NSMenuItem(title: "Approve Launch at Login…", action: #selector(openLoginSettings), keyEquivalent: "")
+    private let automaticUpdatesItem = NSMenuItem(title: "Automatically Check for Updates", action: #selector(toggleAutomaticUpdates), keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "OL"
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         menu.delegate = self
         problemItem.target = self
         problemItem.isHidden = true
         menu.addItem(problemItem)
         for layout in Layout.allCases {
-            let item = menu.addItem(withTitle: layout.title, action: #selector(apply(_:)), keyEquivalent: "")
+            let item = menu.addItem(withTitle: layout.title, action: #selector(apply(_:)), keyEquivalent: String(layout.rawValue))
+            item.keyEquivalentModifierMask = [.command, .option]
             item.target = self
             item.representedObject = layout.rawValue
         }
         menu.addItem(.separator())
-        let switchItem = menu.addItem(withTitle: "Switch Display", action: #selector(switchDisplay), keyEquivalent: "")
+        let switchItem = menu.addItem(withTitle: "Move to Next Display", action: #selector(switchDisplay), keyEquivalent: "0")
+        switchItem.keyEquivalentModifierMask = [.command, .option]
         switchItem.target = self
         menu.addItem(.separator())
         let accessibilityItem = menu.addItem(withTitle: "Accessibility Settings…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
@@ -78,13 +84,26 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         menu.addItem(loginItem)
         menu.addItem(loginSettingsItem)
         updateLoginItem()
-        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(.separator())
+        let updatesItem = menu.addItem(withTitle: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        updatesItem.target = updaterController
+        automaticUpdatesItem.target = self
+        menu.addItem(automaticUpdatesItem)
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit Optimal Layout", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
         installHotkeys()
         requestAccessibility()
     }
 
-    func menuWillOpen(_ menu: NSMenu) { updateLoginItem() }
+    func menuWillOpen(_ menu: NSMenu) {
+        updateLoginItem()
+        automaticUpdatesItem.state = updaterController.updater.automaticallyChecksForUpdates ? .on : .off
+    }
+
+    @objc private func toggleAutomaticUpdates() {
+        updaterController.updater.automaticallyChecksForUpdates.toggle()
+    }
 
     private func updateLoginItem() {
         let status = SMAppService.mainApp.status
@@ -163,7 +182,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func updateProblems() {
         let messages = problems.messages
-        statusItem.button?.title = messages.isEmpty ? "OL" : "OL!"
+        let label = messages.isEmpty ? "Optimal Layout" : "Optimal Layout needs attention"
+        let symbol = messages.isEmpty ? "rectangle.split.2x2" : "exclamationmark.triangle"
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
+            .withSymbolConfiguration(.init(pointSize: 16, weight: .regular))
+        image?.isTemplate = true
+        statusItem.button?.image = image
+        statusItem.button?.setAccessibilityLabel(label)
         statusItem.button?.toolTip = messages.isEmpty ? "Optimal Layout" : messages.joined(separator: "\n\n")
         problemItem.isHidden = messages.isEmpty
         problemItem.title = problems.windowFailure == nil ? "Shortcut Problems…" : "Window Command Failed…"
