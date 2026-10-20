@@ -8,6 +8,10 @@ A lightweight modern-macOS-compliant take on [Optimal Layout 🪦2015🥀](https
 Arrange the focused window with keyboard shortcuts or menu commands.
 Requires macOS 14+ on Apple Silicon or Intel.
 
+**[Download the latest release](https://github.com/sbone/simple-window-manager/releases/latest)**
+ · [Report a bug](https://github.com/sbone/simple-window-manager/issues/new?template=bug_report.md)
+ · [Browse feedback](https://github.com/sbone/simple-window-manager/issues)
+
 ## Install
 
 Download the DMG from [GitHub Releases](https://github.com/sbone/simple-window-manager/releases/latest)
@@ -29,9 +33,16 @@ Login in the old copy before enabling it in the installed copy.
 
 For updates, choose **Check for Updates…** from the menu. Builds before 0.2.0
 need one manual replacement in Applications while OL is closed. To uninstall,
-disable Launch at Login, quit, and move it to Trash. Send test feedback with the
-release version/build, macOS version, affected app, shortcut, display arrangement,
-and expected versus actual behavior. See the [included quick start](Resources/Install.txt).
+disable Launch at Login, quit, and move it to Trash.
+See the [included quick start](Resources/Install.txt).
+
+## Feedback
+
+[Report a bug](https://github.com/sbone/simple-window-manager/issues/new?template=bug_report.md)
+with the app version/build, macOS version, affected app, shortcut or menu command,
+display arrangement, and expected versus actual behavior. **Settings → Copy
+Diagnostics** supplies version and status details. Review it before posting:
+the app's local path may contain your username or other personal folder names.
 
 ## Window controls
 
@@ -85,6 +96,30 @@ apps with minimum window sizes, and additional display arrangements need validat
 checks API results but does not read frames back, so an app can report success
 while constraining the requested size. See the [verification record](DEVELOPMENT.md#verification-record) for outstanding
 release checks.
+
+## Design choices
+
+The app keeps common window arrangements a keystroke away. Four fixed layouts
+cover filling the usable screen, working side by side, centering a narrower
+window, and arranging quarters. Cycling halves and corners keeps the shortcut
+set small; cycles are shared across windows. Custom layouts and per-app rules
+would add configuration beyond this focused scope.
+
+AppKit owns the menu-bar app and SwiftUI presents Settings. Accessibility APIs
+move the focused window; Carbon registers global shortcuts without requiring
+Input Monitoring. Menu commands use the same window-control path, so they remain
+available when a shortcut cannot be registered.
+
+Geometry is separate from macOS calls, and the Accessibility boundary is
+injectable. This lets unit tests check display coordinates, layout cycles, and
+API failures without moving real windows. A separate GUI harness exercises
+the installed behavior on a logged-in desktop.
+
+Distribution uses Developer ID signing, notarized universal DMGs, and Sparkle
+with signed update metadata. Publishing builds fresh artifacts from the exact
+source commit. These checks do not prove every installation or upgrade journey:
+the [verification record](DEVELOPMENT.md#verification-record) distinguishes
+completed checks from pending fresh-Mac, Intel, and real-update testing.
 
 ## App icon
 
