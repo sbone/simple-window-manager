@@ -1,81 +1,37 @@
-# Beads - AI-Native Issue Tracking
+# Beads in this repository
 
-Welcome to Beads! This repository uses **Beads** for issue tracking - a modern, AI-native tool designed to live directly in your codebase alongside your code.
+Use `bd` for tasks and `bd remember` for persistent project knowledge.
+[AGENTS.md](../AGENTS.md) defines the repository workflow; the project uses Codex.
 
-## What is Beads?
-
-Beads is issue tracking that lives in your repo, making it perfect for AI coding agents and developers who want their issues close to their code. No web UI required - everything works through the CLI and integrates seamlessly with git.
-
-**Learn more:** [github.com/steveyegge/beads](https://github.com/steveyegge/beads)
-
-## Quick Start
-
-### Essential Commands
-
-```bash
-# Create new issues
-bd create "Add user authentication"
-
-# View all issues
-bd list
-
-# View issue details
-bd show <issue-id>
-
-# Update issue status
-bd update <issue-id> --claim
-bd update <issue-id> --status done
-
-# Sync with Dolt remote
-bd dolt push
+```sh
+bd prime                 # Load workflow context
+bd ready                 # Find available work
+bd show <id>             # Read a task
+bd update <id> --claim    # Claim it
+bd close <id>            # Close completed work
 ```
 
-### Working with Issues
+Issues live in the local Dolt database, not in source-code Git commits.
+Cross-machine sync uses `bd dolt push` / `bd dolt pull` over the configured Git
+remote under `refs/dolt/data`. Run remote sync only when explicitly requested.
+A normal `git push` does not replace issue-data sync.
 
-Issues in Beads are:
-- **Git-native**: Stored in Dolt database with version control and branching
-- **AI-friendly**: CLI-first design works perfectly with AI coding agents
-- **Branch-aware**: Issues can follow your branch workflow
-- **Sync-ready**: Uses Dolt remotes for backup and team sharing
+JSONL auto-export is disabled because Codex uses the `bd` CLI directly.
+An existing `.beads/issues.jsonl` is an ignored, potentially stale export;
+it is neither the source of truth nor a backup. Do not import it during
+normal operation. Preserve the database and metadata when cleaning up.
 
-## Why Beads?
+## Setup maintenance
 
-✨ **AI-Native Design**
-- Built specifically for AI-assisted development workflows
-- CLI-first interface works seamlessly with AI coding agents
-- No context switching to web UIs
+Codex uses `.agents/skills/beads/`, `.codex/hooks.json` and `AGENTS.md`.
+Check installation with `bd setup codex --check`. If repairs are needed,
+`bd setup codex` refreshes that integration; review its changes afterward.
+The Git hook shims in `.beads/hooks/` are separate from Codex's context hooks.
+Check their installation with `bd hooks list`.
 
-🚀 **Developer Focused**
-- Issues live in your repo, right next to your code
-- Works offline, syncs when you push
-- Fast, lightweight, and stays out of your way
-
-🔧 **Git Integration**
-- Dolt-native sync via bd dolt push / bd dolt pull
-- Branch-aware issue tracking
-- Dolt-native three-way merge resolution
-
-## Get Started with Beads
-
-Try Beads in your own projects:
-
-```bash
-# Install Beads
-curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
-
-# Initialize in your repo
-bd init
-
-# Create your first issue
-bd create "Try out Beads"
-```
-
-## Learn More
-
-- **Documentation**: [github.com/steveyegge/beads/docs](https://github.com/steveyegge/beads/tree/main/docs)
-- **Quick Start Guide**: Run `bd quickstart`
-- **Examples**: [github.com/steveyegge/beads/examples](https://github.com/steveyegge/beads/tree/main/examples)
-
----
-
-*Beads: Issue tracking that moves at the speed of thought* ⚡
+Beads 1.3.1's `bd init` automatically stages and commits setup files and
+installs Claude, Codex and Cursor integrations by default. This repository is
+already initialized; do not rerun init as a routine repair. The
+[init implementation](https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/init.go)
+explains the bootstrap commit. Disabling Dolt auto-commit does not disable
+that source-code Git commit.

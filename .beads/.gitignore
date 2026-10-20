@@ -65,6 +65,9 @@ dolt-pprof/
 # Backup data (auto-exported JSONL, local-only)
 backup/
 
+# Optional passive export; Codex uses the Dolt database through bd.
+issues.jsonl
+
 # Per-project environment file (Dolt connection config, GH#2520)
 .env
 
