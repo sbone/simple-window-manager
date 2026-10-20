@@ -87,6 +87,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         loginSettingsItem.target = self
         menu.addItem(loginItem)
         menu.addItem(loginSettingsItem)
+        settings.refresh()
         updateLoginItem()
         menu.addItem(.separator())
         let updatesItem = menu.addItem(withTitle: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
@@ -129,7 +130,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func updateLoginItem() {
-        let status = SMAppService.mainApp.status
+        let status = settings.loginStatus
         loginItem.state = status == .enabled ? .on : status == .requiresApproval ? .mixed : .off
         loginSettingsItem.isHidden = status != .requiresApproval
     }
