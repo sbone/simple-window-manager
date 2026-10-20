@@ -1,4 +1,4 @@
-Optimal Layout — 0.2.0 (3)
+Optimal Layout
 
 Requires macOS 14 or later. Supports Apple Silicon and Intel Macs.
 

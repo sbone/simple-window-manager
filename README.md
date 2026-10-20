@@ -137,8 +137,9 @@ The final check mounts the DMG read-only and verifies the contents, both signed
 architectures, and Gatekeeper acceptance of the app. Rerun it independently with
 `bash scripts/check-dmg.sh dist/Optimal-Layout-VERSION-BUILD.dmg`.
 
-Increment `CFBundleVersion` in `Resources/Info.plist` for each shared build and
-update the version in `Resources/Install.txt`. Distribution follows Apple's
+Increment `CFBundleVersion` in `Resources/Info.plist` for each shared build.
+The installer instructions receive the version and build from the packaged app.
+Distribution follows Apple's
 [notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
 Sparkle verifies signed updates before installing them. Use **Automatically Check
 for Updates** in the menu to control background checks; installation uses Sparkle’s
@@ -146,7 +147,7 @@ standard confirmation UI.
 
 `make dist` also creates and verifies `dist/appcast.xml`, signed with the same
 Sparkle Keychain key used by Makestem. Before publishing, update both version
-fields, the installation guide, and `Resources/ReleaseNotes.md`, then commit and
+fields and `Resources/ReleaseNotes.md`, then commit and
 push the reviewed source to `main`. Install GitHub CLI and authenticate with
 `gh auth login`. Run `make publish` to check authentication, repository visibility,
 and version availability before rebuilding and notarizing the installer. It uploads

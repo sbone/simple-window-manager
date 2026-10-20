@@ -30,7 +30,7 @@ stage=$(mktemp -d "$PWD/.build/distribution.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 ditto "$app" "$stage/Optimal Layout.app"
 ln -s /Applications "$stage/Applications"
-cp Resources/Install.txt "$stage/Read Me.txt"
+sed "1s/.*/Optimal Layout — $version ($build)/" Resources/Install.txt > "$stage/Read Me.txt"
 dmg="$PWD/dist/Optimal-Layout-$version-$build.dmg"
 hdiutil create -volname "Optimal Layout $version" -srcfolder "$stage" -format UDZO -ov "$dmg"
 codesign --force --sign "$signing_identity" --timestamp "$dmg"
