@@ -34,8 +34,6 @@ test "$commit" = "$(git rev-parse HEAD)" && test -z "$(git status --porcelain)" 
     exit 1
 }
 (cd dist && shasum -a 256 -c "$(basename "$dmg").sha256")
-bash scripts/check-dmg.sh "$dmg"
-python3 scripts/check-appcast.py dist/appcast.xml "$dmg"
 gh release create "v$version" --repo "$repository" \
     "$dmg" "$dmg.sha256" dist/appcast.xml \
     --target "$commit" --title "Optimal Layout $version" --notes-file Resources/ReleaseNotes.md --latest

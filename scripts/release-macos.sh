@@ -13,7 +13,7 @@ fi
 # Validate credentials before building; never read the password out of Keychain.
 xcrun notarytool history --keychain-profile "$notary_profile" >/dev/null
 
-swift test
+make test
 sparkle_tools="$PWD/.build/artifacts/sparkle/Sparkle/bin"
 public_key=$("$sparkle_tools/generate_keys" -p)
 if [ "$public_key" != "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Resources/Info.plist)" ]; then

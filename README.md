@@ -153,8 +153,9 @@ and version availability before rebuilding and notarizing the installer. It uplo
 the fresh DMG, checksum, and feed as a release targeting that exact commit, and
 stops if the source changes during the build. The repository
 must remain public so installed apps can fetch updates without authentication.
-The publisher verifies the archive and feed again and refuses to replace an
-existing version. Builds before 0.2.0 need one manual installation to gain Sparkle.
+The release builder verifies the archive and feed; publishing also checks the
+checksum and refuses to replace an existing version. Builds before 0.2.0 need
+one manual installation to gain Sparkle.
 
 The 24 unit tests cover window geometry, display selection, layout cycles,
 Accessibility failures, and shortcut registration. They do not move real windows

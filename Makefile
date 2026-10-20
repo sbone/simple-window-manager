@@ -17,6 +17,7 @@ publish:
 
 test:
 	swift test
+	python3 scripts/test-publish-release.py
 
 smoke-test:
 	bash scripts/smoke-test.sh
