@@ -1,7 +1,8 @@
 # Optimal Layout 2.3.2 Reverse Engineering
 
-> Historical investigation and development log. For current installation,
-> signing, release packaging, and test instructions, see [README.md](README.md).
+> Findings about the legacy app. For the replacement’s current usage, see
+> [README.md](README.md); for build, release, and verification details, see
+> [DEVELOPMENT.md](DEVELOPMENT.md).
 
 This is the working findings report for the clean-room replacement. Conclusions are labeled by evidence level.
 
@@ -181,62 +182,8 @@ The first implementation should contain only:
 
 The initial vertical slice, all four built-in commands, and failure reporting are implemented. Automated GUI checks now validate layout cycles, menu commands, and warning presentation on one display. A physical two-display transfer and wraparound now also pass; other display arrangements and third-party window constraints remain to validate before adding preferences.
 
-## Implementation Progress
+## Replacement development
 
-**Started:** a dependency-free Swift package now exists in `Package.swift` and `Sources/OptimalLayout/main.swift`.
-
-The first slice includes:
-
-- an accessory/menu-bar application entry point;
-- four built-in layout actions;
-- the `⌘⌥2` left/right cycle;
-- the `⌘⌥4` upper-left → upper-right → lower-right → lower-left cycle;
-- Carbon global hotkey registration for `⌘⌥1` through `⌘⌥4` and `⌘⌥0`;
-- focused-window lookup through Accessibility;
-- frame updates through Accessibility position and size attributes;
-- next-display movement preserving the current relative position.
-
-**Confirmed by build validation — 2026-09-28, M4 MacBook Air:** native debug and universal release builds now pass with Xcode 26.3, Swift 6.2.4, and the macOS 26.2 SDK on macOS 15.8. The former toolchain blocker no longer reproduces. Sandboxed builds still require access to Swift's user cache directories.
-
-`make build` packages a native debug app; `make release` packages an optimized universal app. Both produce an ad-hoc-signed `Optimal Layout.app` with a separate development bundle identifier, `local.OptimalLayout`. Binary inspection confirms both `arm64` and `x86_64` slices target macOS 14.0, and strict code-signature verification passes. The app now requests Accessibility access at launch and from its menu. See [README.md](README.md) for setup and a manual smoke test.
-
-**Confirmed by runtime behavior — user-reported, 2026-09-28:** the replacement app successfully adjusts a VS Code window on the M4 MacBook Air. This validates the initial window-control path in a real application. The report does not specify which commands were exercised, so complete cycle order, menu-bar/Dock clearance, other applications, and multi-display behavior remain unverified.
-
-The current Switch Display prototype preserves absolute size and proportional position; this differs from the proportional-size candidate above and does not establish the legacy app's behavior. Preferences and distribution notarization remain outstanding; subsequent signing, error-reporting, and launch-at-login work is recorded below.
-
-**Confirmed by automated tests — 2026-09-28:** nine Swift Testing tests now exercise the app's extracted `WindowGeometry` code via `swift test` or `make test`. Coverage includes layout bounds, half/quadrant cycle order and reset, fractional sizes, display-transfer geometry, coordinate conversion, and display selection. No real windows or Accessibility permissions are needed for these tests.
-
-Two regression tests failed against the original geometry and passed after fixes:
-
-- AX/AppKit conversion now uses the primary display's top edge, rather than the maximum top edge across all displays. A display above the primary display previously shifted every converted window frame. Apple's [NSScreen.screens documentation](https://developer.apple.com/documentation/appkit/nsscreen/screens) identifies index zero as the primary display with origin `(0, 0)`.
-- A window spanning displays now selects the display with the greatest intersection area, rather than the first intersecting display. Equal areas keep display order; zero overlap falls back to `NSScreen.main` in the controller.
-
-These are replacement correctness fixes, not new evidence of legacy behavior. GUI shortcut/menu delivery, actual AX resize acceptance, physical multi-display operation, and failure feedback are not covered by the geometry suite. The [README automation plan](README.md#build-and-test) describes the remaining opt-in integration checks.
-
-**Confirmed by runtime failure and macOS logs — 2026-09-28:** after rebuilding with `make run`, the user reported that both keyboard shortcuts and menu commands stopped moving windows. `tccd` logged `Failed to match existing code requirement` for `local.OptimalLayout` and `kTCCServiceAccessibility`, showing that the prior universal build's code hashes did not match the new native debug build. This is an invalidated Accessibility grant, not a geometry-test failure. Recovery is to quit OL, remove and re-add the current app in Accessibility settings, then reopen it without rebuilding.
-
-**Confirmed by runtime behavior — user-reported, 2026-09-28:** resetting Accessibility access restored window control after the rebuild failure. This confirms the diagnosed permission issue and recovery procedure.
-
-Both command entry points now share a trust check and show recovery instructions when permission is missing. The build script accepts `CODE_SIGN_IDENTITY` for certificate signing. Geometry tests do not validate TCC permission persistence; the new recovery dialog still needs runtime verification.
-
-**Confirmed by signing inspection and runtime permission checks — 2026-09-28:** the M4 Air already has a valid `Developer ID Application: Quality Time Studio LLC (6HA2HQH2U5)` identity. Sandboxed Keychain inspection had incorrectly appeared to show no valid identities; inspection with Keychain access found the existing certificate. Its reference is now saved in git-ignored `.codesign-identity`, and the build script uses that file unless `CODE_SIGN_IDENTITY` overrides it. Unconfigured builds fail explicitly; ad-hoc signing requires an explicit `-` identity.
-
-The user granted Accessibility once after the change to certificate signing. `make check-accessibility` then reported `Accessibility: allowed` for the native debug bundle. After quitting OL and replacing it with a certificate-signed universal release, the same check still reported `Accessibility: allowed`, with no permission reset. The binaries' code hashes differed, their designated requirements were identical, and strict signature validation passed. This directly verifies that the grant survived a changed build with the stable identity on this Mac.
-
-The check launches the actual app through Launch Services with `--check-accessibility`, reads `AXIsProcessTrusted()`, and exits before shortcut registration or the app event loop. It does not move windows or grant permissions. The existing nine geometry tests also pass. Distribution notarization remains outside this local development setup.
-
-**Failure reporting implemented — 2026-09-28:** focused-window and frame access now propagate Accessibility errors and validate returned CF/AX types instead of silently returning or inventing zero frames. Position and size are checked for writability before either is changed. A failed position write prevents resize; a failed size write after movement explicitly reports a partial change. Failed layout attempts retain their cycle position. Missing applications/windows/displays and single-display Switch Display attempts have explicit messages.
-
-Global shortcuts now request exclusive Carbon registration and retain individual failures while continuing with other shortcuts. Event-handler installation and event decoding are checked. The menu-bar label changes to `OL!` when problems exist; menu details identify affected shortcuts or the last failed window command. Window failures beep without opening a dialog automatically. Successful window commands clear only the window error, preserving shortcut warnings. Registrations and the event handler are released at termination.
-
-**Confirmed by automated tests:** the suite now has 24 passing tests: nine geometry tests and fifteen failure tests (two parameterized). Injected C API responses exercise absent/wrong-type focused windows, failed reads, malformed frames, unwritable attributes, rejected moves/resizes, partial changes, successful writes, cycle preservation, shortcut conflicts/unexpected errors, continued registration, and warning retention. These tests do not register real shortcuts or move windows. Physical shortcut conflicts and GUI warning presentation still need integration testing; applications that return success while clamping frames require future read-back verification.
-
-**Confirmed by native runtime check — 2026-09-28:** after launching the signed universal app, a temporary second process compiled with the production `Shortcut` implementation attempted to register all five exclusive combinations. Every attempt returned `eventHotKeyExistsErr` (`-9878`), with the correct shortcut-specific message. The probe sent no keyboard events or window commands. Strict signature verification passed and `make check-accessibility` still reported allowed. This verifies actual Carbon conflict detection; GUI warning presentation and actual window-operation failure feedback remain to be exercised by a GUI harness.
-
-**Confirmed by GUI integration tests — 2026-09-28:** two complete `make smoke-test` runs passed 27 checks on the M4 Air, including the final focus guard. A separately signed AppKit helper sends real shortcuts, clicks OL menus through Accessibility, and compares its actual window frame with independent expectations. Full, centered, half, and quadrant placements and wraparound pass through both command paths. A non-resizable fixture verifies no partial movement, the warning indicator and dialog, cycle-preserving retry, and warning clearance. Reserving ⌘⌥2 in the helper verifies the exact conflict dialog, another shortcut still working, menu fallback, and persistent shortcut warnings after successful commands.
-
-The helper required a separate user-granted Accessibility permission; its first blocked run reported that requirement and restored OL. Subsequent signed rebuilds retained access. Successful runs closed the fixture, released the temporary shortcut, and restored normal OL. The 24 unit tests also still pass. The harness skips physical multi-display checks explicitly when only one display is exposed, as on these runs. These results establish replacement behavior for the controlled fixture, not legacy behavior or universal compatibility with third-party/full-screen windows. Production frame read-back remains future work. See [README GUI smoke test](README.md#build-and-test) for rerun instructions and logs.
-
-**Confirmed by physical two-display GUI test — 2026-09-28:** with a second monitor connected via HDMI through a USB hub, `make smoke-test` detected two displays and passed 29 checks with zero skips. The actual ⌘⌥0 shortcut moved the owned fixture to display index 1 at `(2902, 546, 400, 250)`; the Switch Display menu command wrapped to index 0 at `(512, 282, 400, 250)`. Both actual frames matched independently calculated expectations within 2 points, preserving absolute size and proportional position. All existing placement and warning checks also passed. This validates the current connected arrangement, not every display topology or third-party application's constraints.
-
-**Launch at Login implemented and integration-tested — 2026-09-28:** the replacement uses Apple's `SMAppService.mainApp` directly from its menu, with no additional helper or preference store. Opening the menu reads current macOS status, including changes made in System Settings. Pending approval is shown with a mixed state and a settings link; registration/unregistration failures appear in a dialog. The optional `--login-item` smoke-test mode exercises the actual menu toggle, restarts OL to verify persistence, and restores and rechecks the original setting. All 31 GUI checks passed on two displays; the 24 unit tests and universal release compilation also passed. This verifies registration, not startup after an actual logout/reboot; pending-approval and error UI paths were not triggered on this Mac.
+Current build and test instructions live in [DEVELOPMENT.md](DEVELOPMENT.md).
+The original investigation plan and development history are
+[archived](docs/archive/optimal-layout-reverse-engineering-handoff.md).
