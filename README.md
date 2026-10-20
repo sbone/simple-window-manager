@@ -103,7 +103,7 @@ Keep the app at a stable path; rebuilding in place preserves it.
 | `make build` | Package and sign a native debug app |
 | `make release` | Package and sign a universal arm64 + x86_64 release |
 | `make dist` | Test, build, notarize, and create a distributable DMG |
-| `make publish` | Publish the reviewed DMG and signed Sparkle feed to GitHub |
+| `make publish` | Test, build, notarize, and publish a GitHub release and Sparkle feed |
 | `swift build` | Compile the executable only |
 | `make check-accessibility` | Check the existing bundle's Accessibility grant |
 | `make test` | Run unit tests without Accessibility permission |
@@ -146,9 +146,12 @@ standard confirmation UI.
 
 `make dist` also creates and verifies `dist/appcast.xml`, signed with the same
 Sparkle Keychain key used by Makestem. Before publishing, update both version
-fields, the installation guide, and `Resources/ReleaseNotes.md`; build with
-`make dist`, then commit and push the reviewed source to `main`. Run `make publish`
-to upload the DMG, checksum, and feed as a versioned GitHub release. The repository
+fields, the installation guide, and `Resources/ReleaseNotes.md`, then commit and
+push the reviewed source to `main`. Install GitHub CLI and authenticate with
+`gh auth login`. Run `make publish` to check authentication, repository visibility,
+and version availability before rebuilding and notarizing the installer. It uploads
+the fresh DMG, checksum, and feed as a release targeting that exact commit, and
+stops if the source changes during the build. The repository
 must remain public so installed apps can fetch updates without authentication.
 The publisher verifies the archive and feed again and refuses to replace an
 existing version. Builds before 0.2.0 need one manual installation to gain Sparkle.
