@@ -46,7 +46,7 @@ private final class WindowController {
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let windows = WindowController()
-    private var hotkeys: [EventHotKeyRef] = []
+    private var hotkeys: [UInt32: EventHotKeyRef] = [:]
     private var eventHandler: EventHandlerRef?
     private var statusItem: NSStatusItem!
     private var showingPermissionAlert = false
@@ -114,6 +114,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             mainMenu.addItem(item)
         }
         NSApp.mainMenu = mainMenu
+        settings.retryShortcuts = { [weak self] in self?.installHotkeys() }
         installHotkeys()
         requestAccessibility()
     }
@@ -213,6 +214,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func updateProblems() {
+        settings.refresh()
         let messages = settings.problems.messages
         let label = messages.isEmpty ? "Optimal Layout" : "Optimal Layout needs attention"
         let symbol = messages.isEmpty ? "rectangle.split.2x2" : "exclamationmark.triangle"
@@ -227,16 +229,23 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     @objc private func showProblems() {
+        updateProblems()
         let previousApp = NSWorkspace.shared.frontmostApplication
         let alert = NSAlert()
         alert.messageText = "Optimal Layout needs attention"
         alert.informativeText = settings.problems.messages.joined(separator: "\n\n")
+        alert.addButton(withTitle: "OK")
+        if !settings.problems.shortcutFailures.isEmpty { alert.addButton(withTitle: "Retry Shortcuts") }
         NSApp.activate()
-        alert.runModal()
+        if alert.runModal() == .alertSecondButtonReturn { installHotkeys() }
         previousApp?.activate(options: [])
     }
 
     private func installHotkeys() {
+        if eventHandler != nil {
+            registerShortcuts()
+            return
+        }
         let type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
         let handlerResult = InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
             guard let event, let userData else { return noErr }
@@ -253,7 +262,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             updateProblems()
             return
         }
-        let registration = Shortcut.registerAll()
+        registerShortcuts()
+    }
+
+    private func registerShortcuts() {
+        let registration = Shortcut.registerAll(keeping: hotkeys)
         hotkeys = registration.references
         settings.problems.shortcutFailures = registration.failures
         for failure in registration.failures { NSLog("Shortcut registration failed: %@", failure) }
@@ -261,7 +274,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        for hotkey in hotkeys { UnregisterEventHotKey(hotkey) }
+        for hotkey in hotkeys.values { UnregisterEventHotKey(hotkey) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
     }
 }

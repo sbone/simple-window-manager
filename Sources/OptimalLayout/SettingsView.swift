@@ -59,8 +59,11 @@ struct SettingsView: View {
                     Label(settings.problems.shortcutFailures.isEmpty ? "All registered" : "Conflicts or errors",
                           systemImage: settings.problems.shortcutFailures.isEmpty ? "checkmark.circle" : "exclamationmark.triangle")
                 }
-                ForEach(settings.problems.shortcutFailures, id: \.self) { failure in
+                ForEach(settings.problems.shortcutMessages, id: \.self) { failure in
                     Text(failure).textSelection(.enabled)
+                }
+                if !settings.problems.shortcutFailures.isEmpty {
+                    Button("Retry Shortcuts", action: settings.retryShortcuts)
                 }
                 LabeledContent("Last window command error", value: settings.problems.windowFailure == nil ? "None recorded" : "Needs attention")
                 if let failure = settings.problems.windowFailure {

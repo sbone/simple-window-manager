@@ -66,7 +66,13 @@ Partial moves are reported; failed layouts do not advance the cycle. A successfu
 command clears the window error.
 
 **Shortcut Problems…** identifies registration failures. Other shortcuts and
-menu commands remain available. Resolve the conflict and restart OL to retry.
+menu commands remain available. macOS does not identify the app that owns a
+conflicting shortcut. The warning and Settings diagnostics list other running
+copies of Optimal Layout with their process IDs and locations as possible conflicts.
+If all five shortcuts conflict but still move windows, another copy or window
+manager may be handling them. Quit the extra copies, then choose **Retry Shortcuts**
+in the warning or Settings. If needed, quit other shortcut apps one at a time and
+retry to identify the conflict. Working shortcuts stay registered during retries.
 Conflict detection covers errors reported by Carbon, not every third-party
 shortcut interception mechanism.
 

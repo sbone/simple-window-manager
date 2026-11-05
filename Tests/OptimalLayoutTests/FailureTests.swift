@@ -201,11 +201,42 @@ struct FailureTests {
         }
     }
 
+    @Test func retryOnlyRegistersMissingShortcutsAndClearsResolvedFailures() {
+        let first = Shortcut.registerAll { shortcut in
+            if shortcut.id == 2 { throw ShortcutFailure(shortcut: shortcut.label, status: OSStatus(eventHotKeyExistsErr)) }
+            return OpaquePointer(bitPattern: Int(shortcut.id) + 1)!
+        }
+        var attempted: [UInt32] = []
+        let stillConflicting = Shortcut.registerAll(keeping: first.references) { shortcut in
+            attempted.append(shortcut.id)
+            throw ShortcutFailure(shortcut: shortcut.label, status: OSStatus(eventHotKeyExistsErr))
+        }
+        #expect(attempted == [2])
+        #expect(stillConflicting.references == first.references)
+        #expect(stillConflicting.failures == first.failures)
+        attempted = []
+        let recovered = Shortcut.registerAll(keeping: stillConflicting.references) { shortcut in
+            attempted.append(shortcut.id)
+            return OpaquePointer(bitPattern: 42)!
+        }
+        #expect(attempted == [2])
+        #expect(recovered.references.count == 5)
+        #expect(recovered.failures.isEmpty)
+        for (id, reference) in first.references { #expect(recovered.references[id] == reference) }
+        let unchanged = Shortcut.registerAll(keeping: recovered.references) { _ in
+            Issue.record("Working shortcuts must not be registered twice")
+            return OpaquePointer(bitPattern: 99)!
+        }
+        #expect(unchanged.references == recovered.references)
+        #expect(unchanged.failures.isEmpty)
+    }
+
     @Test func successfulWindowCommandDoesNotClearShortcutProblems() {
         var problems = AppProblems(shortcutFailures: ["⌘⌥2 is unavailable"], windowFailure: "No focused window")
-        #expect(problems.messages.count == 2)
+        #expect(problems.messages.contains("No focused window"))
         problems.windowFailure = nil
-        #expect(problems.messages == ["⌘⌥2 is unavailable"])
+        #expect(problems.messages.contains("⌘⌥2 is unavailable"))
+        #expect(!problems.messages.contains("No focused window"))
         problems.shortcutFailures = []
         #expect(problems.messages.isEmpty)
     }

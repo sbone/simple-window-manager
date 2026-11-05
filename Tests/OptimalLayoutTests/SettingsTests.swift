@@ -42,4 +42,21 @@ struct SettingsTests {
         #expect(settings.diagnostics.contains("⌘⌥2 is unavailable"))
         #expect(settings.diagnostics.contains("Last window command error: None recorded"))
     }
+
+    @Test func shortcutDiagnosticsIdentifyPossibleCopiesWithoutClaimingOwnership() {
+        let settings = model()
+        let copy = "Optimal Layout — PID 123 — /Applications/Optimal Layout.app"
+        settings.problems = AppProblems(shortcutFailures: ["⌘⌥2 is already registered"], otherRunningCopies: [copy])
+        for detail in [copy, "possible conflicts", "macOS does not tell", "another running copy", "Retry Shortcuts"] {
+            #expect(settings.problems.messages.joined(separator: "\n").contains(detail))
+            #expect(settings.diagnostics.contains(detail))
+        }
+        settings.problems.otherRunningCopies = []
+        #expect(!settings.diagnostics.contains("possible conflicts"))
+        #expect(settings.diagnostics.contains("macOS does not tell"))
+        settings.problems.otherRunningCopies = [copy]
+        settings.problems.shortcutFailures = []
+        #expect(settings.problems.messages.isEmpty)
+        #expect(settings.diagnostics.contains("Shortcuts: All registered"))
+    }
 }

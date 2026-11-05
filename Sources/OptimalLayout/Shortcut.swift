@@ -7,9 +7,9 @@ struct ShortcutFailure: Error, LocalizedError, Equatable {
 
     var errorDescription: String? {
         if status == eventHotKeyExistsErr {
-            return "\(shortcut) is already registered. Change or disable the conflicting shortcut in the other app, then restart OL. You can still use the menu command."
+            return "\(shortcut) is already registered, so this copy of Optimal Layout could not register it."
         }
-        return "\(shortcut) could not be registered (macOS error \(status)). Restart OL and try again. You can still use the menu command."
+        return "\(shortcut) could not be registered (macOS error \(status)). Choose Retry Shortcuts to try again. You can still use the menu command."
     }
 }
 
@@ -27,12 +27,12 @@ struct Shortcut: Sendable {
     var label: String { "⌘⌥\(id) (\(Layout(rawValue: id)?.title ?? "Move to Next Display"))" }
 
     @MainActor
-    static func registerAll(using register: (Shortcut) throws -> EventHotKeyRef = { try $0.register() }) -> (references: [EventHotKeyRef], failures: [String]) {
-        var references: [EventHotKeyRef] = []
+    static func registerAll(keeping existing: [UInt32: EventHotKeyRef] = [:], using register: (Shortcut) throws -> EventHotKeyRef = { try $0.register() }) -> (references: [UInt32: EventHotKeyRef], failures: [String]) {
+        var references = existing
         var failures: [String] = []
-        for shortcut in all {
+        for shortcut in all where references[shortcut.id] == nil {
             do {
-                references.append(try register(shortcut))
+                references[shortcut.id] = try register(shortcut)
             } catch {
                 failures.append(error.localizedDescription)
             }
@@ -54,6 +54,18 @@ struct Shortcut: Sendable {
 struct AppProblems {
     var shortcutFailures: [String] = []
     var windowFailure: String?
+    var otherRunningCopies: [String] = []
 
-    var messages: [String] { shortcutFailures + (windowFailure.map { [$0] } ?? []) }
+    var shortcutMessages: [String] {
+        guard !shortcutFailures.isEmpty else { return [] }
+        var messages = shortcutFailures
+        messages.append("macOS does not tell Optimal Layout which app owns a shortcut. If these shortcuts still move windows, another running copy of Optimal Layout or another window manager may be handling them. Menu commands remain available.")
+        if !otherRunningCopies.isEmpty {
+            messages.append("Other running copies of Optimal Layout (possible conflicts):\n" + otherRunningCopies.joined(separator: "\n"))
+        }
+        messages.append("Quit other copies of Optimal Layout first. If needed, quit other shortcut apps one at a time and choose Retry Shortcuts to check whether the shortcut becomes available.")
+        return messages
+    }
+
+    var messages: [String] { shortcutMessages + (windowFailure.map { [$0] } ?? []) }
 }

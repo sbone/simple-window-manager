@@ -19,6 +19,7 @@ final class SettingsModel {
         }
     }
     let updaterController: SPUStandardUpdaterController
+    var retryShortcuts: () -> Void = {}
 
     init(updaterController: SPUStandardUpdaterController) {
         self.updaterController = updaterController
@@ -52,6 +53,17 @@ final class SettingsModel {
         accessibilityAllowed = AXIsProcessTrusted()
         loginStatus = SMAppService.mainApp.status
         automaticallyChecksForUpdates = updaterController.updater.automaticallyChecksForUpdates
+        problems.otherRunningCopies = NSWorkspace.shared.runningApplications
+            .filter { app in
+                app.processIdentifier != ProcessInfo.processInfo.processIdentifier &&
+                    (app.bundleIdentifier == "com.stevenbone.optimallayout" ||
+                     app.localizedName == "Optimal Layout" ||
+                     app.executableURL?.lastPathComponent == "OptimalLayout")
+            }
+            .map { app in
+                "\(app.localizedName ?? "Optimal Layout") — PID \(app.processIdentifier) — \(app.bundleURL?.path ?? app.executableURL?.path ?? "Location unavailable")"
+            }
+            .sorted()
     }
 
     func openAccessibilitySettings() {
@@ -76,7 +88,7 @@ final class SettingsModel {
         Launch at Login error: \(loginError ?? "None")
         Automatic update checks: \(automaticallyChecksForUpdates ? "Enabled" : "Disabled")
         Displays: \(NSScreen.screens.count)
-        Shortcuts: \(problems.shortcutFailures.isEmpty ? "All registered" : problems.shortcutFailures.joined(separator: "\n"))
+        Shortcuts: \(problems.shortcutFailures.isEmpty ? "All registered" : problems.shortcutMessages.joined(separator: "\n"))
         Last window command error: \(problems.windowFailure ?? "None recorded")
         """
     }
